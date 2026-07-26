@@ -1,7 +1,7 @@
 ---
 paths:
-  - "agents/**"
-  - "skills/**"
+  - "plugins/*/agents/**"
+  - "plugins/*/skills/**"
 ---
 
 # 스킬·에이전트 권한 최소화 원칙

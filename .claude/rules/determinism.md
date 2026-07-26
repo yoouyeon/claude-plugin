@@ -1,7 +1,7 @@
 ---
 paths:
-  - "agents/**"
-  - "skills/**"
+  - "plugins/*/agents/**"
+  - "plugins/*/skills/**"
 ---
 
 # 스킬·에이전트 결정성 원칙 (스크립트 우선)
