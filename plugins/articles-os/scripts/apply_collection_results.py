@@ -93,8 +93,8 @@ def main():
     if not isinstance(results, list):
         die("stdin must be a JSON array of fetch results")
 
-    articles_path = os.path.join(data_path, "data", "articles.json")
-    state_path = os.path.join(data_path, "data", "state.json")
+    articles_path = os.path.join(data_path, "articles.json")
+    state_path = os.path.join(data_path, "state.json")
 
     articles_doc = load_json(articles_path, {"articles": []})
     state_doc = load_json(state_path, {"last_run": None, "sources": {}})

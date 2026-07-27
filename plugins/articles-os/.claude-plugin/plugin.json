@@ -13,5 +13,13 @@
     "articles",
     "active-recall",
     "slack"
-  ]
+  ],
+  "userConfig": {
+    "data_path": {
+      "type": "directory",
+      "title": "데이터 폴더",
+      "description": "소스·수집 이력·학습 메모를 저장할 폴더(플러그인 업데이트와 무관하게 영구 보존됨)",
+      "default": "./articles-os"
+    }
+  }
 }

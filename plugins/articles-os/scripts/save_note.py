@@ -13,7 +13,7 @@ Usage:
     2. 오늘(로컬) 날짜로 파일명 `notes/YYYY-MM-DD-<슬러그>.md`를 조립한다. 같은 이름이
        이미 있으면 `-2`, `-3`...을 붙여 기존 메모를 덮어쓰지 않는다.
     3. frontmatter(title/url/source/date) + stdin 본문으로 파일을 쓴다.
-    4. <data-path>/data/articles.json에서 <url>과 일치하는 아티클을 찾아 note_path를
+    4. <data-path>/articles.json에서 <url>과 일치하는 아티클을 찾아 note_path를
        상대경로(`notes/<파일명>`)로 갱신하고 qa_log를 빈 배열로 비운다.
 
 stdout (JSON):
@@ -70,7 +70,7 @@ def main():
     notes_dir = os.path.join(data_path, "notes")
     os.makedirs(notes_dir, exist_ok=True)
 
-    articles_path = os.path.join(data_path, "data", "articles.json")
+    articles_path = os.path.join(data_path, "articles.json")
     if not os.path.exists(articles_path):
         fail(f"articles.json not found: {articles_path}")
     with open(articles_path, encoding="utf-8") as f:

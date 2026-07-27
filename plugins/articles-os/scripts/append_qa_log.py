@@ -8,7 +8,7 @@ Usage:
 question/answer_digest는 따옴표·줄바꿈이 섞일 수 있어 인자가 아니라 stdin JSON으로 받는다.
 
 동작:
-    1. <data-path>/data/articles.json에서 url이 일치하는 아티클을 찾는다.
+    1. <data-path>/articles.json에서 url이 일치하는 아티클을 찾는다.
     2. {"asked_at": "<현재 ISO8601 UTC>", "question": ..., "answer_digest": ...}를
        그 아티클의 qa_log에 append한다.
     3. articles.json을 저장한다.
@@ -44,7 +44,7 @@ def main():
     if not question or not answer_digest:
         fail("stdin JSON must have non-empty 'question' and 'answer_digest'")
 
-    articles_path = os.path.join(data_path, "data", "articles.json")
+    articles_path = os.path.join(data_path, "articles.json")
     if not os.path.exists(articles_path):
         fail(f"articles.json not found: {articles_path}")
     with open(articles_path, encoding="utf-8") as f:

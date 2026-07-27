@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 
 
 def load_articles(data_path):
-    path = os.path.join(os.path.expanduser(data_path), "data", "articles.json")
+    path = os.path.join(os.path.expanduser(data_path), "articles.json")
     if not os.path.exists(path):
         return []
     with open(path, encoding="utf-8") as f:

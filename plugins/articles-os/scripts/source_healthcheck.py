@@ -4,7 +4,7 @@
 Usage:
     python3 source_healthcheck.py <data-path>
 
-<data-path>/config/sources.yaml, data/articles.json, data/state.json 을 읽어
+<data-path>/config.yaml(sources 섹션), articles.json, state.json 을 읽어
 소스별로 최신 published_at·수집 건수·연속 실패 상태를 집계하고 고정 기준으로
 분류한 뒤 JSON으로 출력한다. 판정 우선순위: dead > quiet > uncollected > normal.
 
@@ -37,14 +37,23 @@ def die(msg):
 
 
 def read_sources(data_path):
-    """config/sources.yaml 파싱 (PyYAML 미의존 — '- name:' / '  url:' 고정 포맷 전제)."""
-    path = os.path.join(data_path, "config", "sources.yaml")
+    """config.yaml의 sources 섹션 파싱 (PyYAML 미의존 — 고정 포맷 전제)."""
+    path = os.path.join(data_path, "config.yaml")
     if not os.path.exists(path):
-        die(f"sources.yaml not found: {path}")
+        die(f"config.yaml not found: {path}")
     sources = []
     current = None
+    in_sources = False
     with open(path, encoding="utf-8") as f:
         for line in f:
+            if re.match(r"^sources:\s*$", line):
+                in_sources = True
+                continue
+            if re.match(r"^notify:\s*$", line):
+                in_sources = False
+                continue
+            if not in_sources:
+                continue
             m_name = re.match(r"^\s*-\s*name:\s*(.+?)\s*$", line)
             if m_name:
                 if current:
@@ -87,10 +96,10 @@ def main():
     data_path = os.path.expanduser(sys.argv[1])
 
     sources = read_sources(data_path)
-    articles = read_json(os.path.join(data_path, "data", "articles.json"), {}).get("articles", [])
-    state = read_json(os.path.join(data_path, "data", "state.json"), {}).get("sources", {})
+    articles = read_json(os.path.join(data_path, "articles.json"), {}).get("articles", [])
+    state = read_json(os.path.join(data_path, "state.json"), {}).get("sources", {})
 
-    # articles.json의 "source"는 sources.yaml의 name과 대응한다(docs/conventions.md 스키마 참고).
+    # articles.json의 "source"는 config.yaml의 sources[].name과 대응한다(docs/conventions.md 스키마 참고).
     latest_by_name = {}
     count_by_name = {}
     for a in articles:
