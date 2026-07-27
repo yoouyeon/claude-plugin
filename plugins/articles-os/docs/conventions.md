@@ -45,7 +45,7 @@
 { "slack_webhook_url": "https://hooks.slack.com/..." }
 ```
 
-`${CLAUDE_PLUGIN_DATA}`는 Claude Code가 관리하는 플러그인 영구 데이터 디렉토리 경로(`~/.claude/plugins/data/<plugin-id>/`)다. `save_secret.py`/`notify.py`는 이 경로를 **인자로만 받는다** — 스크립트 내부에서 `os.environ`으로 다시 읽지 않는다. 호출하는 SKILL.md가 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 커맨드에 그대로 적어 넘긴다(Claude Code가 그 스킬이 속한 플러그인 기준으로 정확히 치환). 이유: 세션에 다른 플러그인의 hook이 실행되면 그 값이 hook 프로세스 스코프를 넘어 일반 Bash 호출에도 남아, 엉뚱한 플러그인의 디렉토리를 가리키는 사고가 실측으로 확인됐다 — 상세: `docs/rationale.md#secrets`. 시크릿은 **오직 여기**. `config.yaml`·데이터 폴더·플러그인 디렉토리에 절대 두지 않는다.
+`${CLAUDE_PLUGIN_DATA}`는 Claude Code가 관리하는 플러그인 영구 데이터 디렉토리 경로(`~/.claude/plugins/data/<plugin-id>/`)다. `save_secret.py`/`notify.py`는 이 경로를 **인자로만 받는다** — 스크립트 내부에서 `os.environ`으로 다시 읽지 않는다. 호출하는 SKILL.md가 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 커맨드에 그대로 적어 넘긴다. 근거: `docs/rationale.md#secrets`. 시크릿은 **오직 여기**. `config.yaml`·데이터 폴더·플러그인 디렉토리에 절대 두지 않는다.
 
 ### `config.yaml` (데이터 폴더 바로 밑)
 

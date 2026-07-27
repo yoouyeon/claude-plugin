@@ -30,7 +30,7 @@
 
 ### 저장 위치 원칙 (배포 핵심)
 
-플러그인 설치 디렉토리는 **읽기 전용**으로 취급하고, 업데이트 시 덮어써질 수 있다. 따라서 사용자가 만든 데이터·설정·런타임 상태는 **전부 플러그인 밖**에 저장한다. 이렇게 하지 않으면 플러그인 업데이트 때 사용자가 등록한 소스·수집 이력·메모가 통째로 사라진다.
+플러그인 설치 디렉토리는 **읽기 전용**으로 취급하고, 업데이트 시 덮어써질 수 있다. 따라서 사용자가 만든 데이터·설정·런타임 상태는 **전부 플러그인 밖**에 저장한다.
 
 새 디렉토리를 우리가 만들지 않고, Claude Code가 이미 관리하는 인프라(`userConfig`, `${CLAUDE_PLUGIN_DATA}`)에 얹는다. 근거: [docs/rationale.md#storage-location](docs/rationale.md#storage-location)
 
@@ -53,9 +53,9 @@ ${CLAUDE_PLUGIN_DATA}/             # Claude Code 기존 인프라 (~/.claude/plu
         └── YYYY-MM-DD-제목슬러그.md
 ```
 
-**역할 분리 원칙:** 기계가 읽는 상태(json)와 사람이 두고 보는 산출물(md)을 섞지 않는다. 학습 메모를 json 안에 파묻으면 나중에 꺼내 보거나 다른 에디터(Obsidian 등)에서 열기 나쁘다. 메모는 이식성 좋은 .md로, articles.json은 그 메모의 존재/경로만 가리킨다.
+**역할 분리 원칙:** 기계가 읽는 상태(json)와 사람이 두고 보는 산출물(md)을 섞지 않는다. 메모는 이식성 좋은 .md로, articles.json은 그 메모의 존재/경로만 가리킨다.
 
-`config.yaml`(사람이 편집하는 설정: sources/notify)과 `articles.json`/`state.json`(기계가 매일 갱신하는 상태)을 굳이 서브폴더로 나누지 않는다 — 파일 4개뿐이라 폴더 depth가 주는 정보량보다 탐색 비용이 크다. `articles.json`과 `state.json`은 반대로 **분리를 유지**한다 — 전자는 계속 쌓이는 이력(커질 수 있음), 후자는 매 실행마다 갱신되는 작은 실행 상태라 합치면 매일 실행마다 전체 이력을 다시 읽고 쓰게 되어 크기·쓰기 빈도가 안 맞는다.
+`config.yaml`(사람이 편집하는 설정: sources/notify)과 `articles.json`/`state.json`(기계가 매일 갱신하는 상태)을 굳이 서브폴더로 나누지 않는다. `articles.json`과 `state.json`은 반대로 **분리를 유지**한다 — 전자는 계속 쌓이는 이력(커질 수 있음), 후자는 매 실행마다 갱신되는 작은 실행 상태다.
 
 ### 온보딩 (필수)
 
@@ -81,17 +81,15 @@ ${CLAUDE_PLUGIN_DATA}/             # Claude Code 기존 인프라 (~/.claude/plu
 
 #### 데이터 폴더 경로 (userConfig)
 
-수집은 매일 1회 **사용자 없이 백그라운드로** 돈다. 그러려면 데이터 폴더 위치를 사람 없이도 결정적으로 알아내야 한다. 이걸 플러그인 매니페스트의 `userConfig(type: directory)` 필드 하나로 해결한다 — Claude Code가 값을 `~/.claude/settings.json`에 저장하고, 스킬 콘텐츠의 `${user_config.data_path}` 자리를 실제 경로로 치환해준다. 이 치환은 대화형 세션은 물론 **OS 스케줄러의 헤드리스 `-p` 호출에서도 동일하게 동작**한다(실측 확인 완료).
+수집은 매일 1회 **사용자 없이 백그라운드로** 돈다. 데이터 폴더 위치는 플러그인 매니페스트의 `userConfig(type: directory)` 필드로 해결한다 — Claude Code가 값을 `~/.claude/settings.json`에 저장하고, 스킬 콘텐츠의 `${user_config.data_path}` 자리를 실제 경로로 치환해준다. 이 치환은 대화형 세션과 **OS 스케줄러의 헤드리스 `-p` 호출 양쪽에서 동일하게 동작**한다.
 
-그 결과 사라진 것들:
-
-- **cwd 기반 추정이 불필요.** 예전엔 "현재 폴더에 저장"이 스케줄 실행 시 cwd가 매번 달라져 문제였는데, `userConfig` 값은 cwd와 무관하게 고정 저장된다.
-- **활성 설치를 고르는 판별 로직 자체가 불필요.** 플러그인당 스코프당 `userConfig` 값은 하나뿐이라 "여러 설치 중 어느 걸 쓸지" 문제가 성립하지 않는다. (이전엔 한 머신에 프로젝트별로 여러 벌 설치하는 시나리오를 대비해 홈 레지스트리 + cwd/단일/다중 판별 로직을 뒀으나, 실제 요구가 아니었다.)
-- **스케줄 작업 커맨드라인에 절대경로를 박아 넣을 필요가 없음.** `claude -p '/articles-os:collect'`처럼 고정 커맨드만 등록하면 된다 — `${user_config.data_path}`가 헤드리스 실행에서도 해석되기 때문.
+- `userConfig` 값은 cwd와 무관하게 고정 저장되므로 cwd 기반 추정이 불필요하다.
+- 플러그인당 스코프당 `userConfig` 값은 하나뿐이라 여러 설치 중 활성 설치를 고르는 판별 로직이 불필요하다.
+- `claude -p '/articles-os:collect'`처럼 고정 커맨드만 등록하면 된다 — `${user_config.data_path}`가 헤드리스 실행에서도 해석되기 때문.
 
 #### 스케줄 등록 (자동 + 확인)
 
-설정 스킬이 OS 스케줄러에 **직접 등록**(매일 1회)하되 등록 전 사용자 확인을 받는다 — macOS는 `~/Library/LaunchAgents/com.articles-os.plist` 작성 후 `launchctl load`, Linux는 `crontab`에 한 줄 추가. 온보딩 목적이 "설치 직후 바로 동작"인데 사용자가 등록을 손수 걸어야 하면 마지막 단계가 반쯤 수동으로 남아 "동작 안 함"처럼 보인다. 수집 실행 로그는 launchd의 `StandardOutPath`/`StandardErrorPath` 또는 cron의 `>> ... 2>&1` 리다이렉션에 맡긴다 — 별도 로그 관리 코드를 만들지 않는다.
+설정 스킬이 OS 스케줄러에 **직접 등록**(매일 1회)하되 등록 전 사용자 확인을 받는다 — macOS는 `~/Library/LaunchAgents/com.articles-os.plist` 작성 후 `launchctl load`, Linux는 `crontab`에 한 줄 추가. 수집 실행 로그는 launchd의 `StandardOutPath`/`StandardErrorPath` 또는 cron의 `>> ... 2>&1` 리다이렉션에 맡긴다 — 별도 로그 관리 코드를 만들지 않는다.
 
 #### 진입 (자동 감지 + 유도)
 
@@ -105,7 +103,7 @@ ${CLAUDE_PLUGIN_DATA}/             # Claude Code 기존 인프라 (~/.claude/plu
 
 **`${CLAUDE_PLUGIN_DATA}/secrets.json` (Claude Code 기존 인프라, 웹훅 시크릿)**
 
-`{ "slack_webhook_url": "..." }` 하나만 담는 flat 파일, `chmod 600`. `${CLAUDE_PLUGIN_DATA}`는 Claude Code가 관리하는 플러그인 영구 데이터 디렉토리 경로(`~/.claude/plugins/data/<plugin-id>/`)다. **스크립트가 이 경로를 `os.environ`으로 다시 읽지 않는다** — 세션에 다른 플러그인의 hook이 실행되면 그 값이 hook 프로세스 스코프를 넘어 일반 Bash 호출에도 남아, 엉뚱한 플러그인의 디렉토리를 가리키는 사고가 실측으로 확인됐다(다른 플러그인의 `secrets.json`을 덮어쓴 사례). 대신 SKILL.md 콘텐츠 안에서 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 그대로 적어 스크립트에 인자로 넘긴다 — 이 치환은 Claude Code가 그 스킬이 속한 플러그인 기준으로 정확히 스코프해준다. 왜 이 경로인지, 왜 `userConfig`로 웹훅까지 대체할 수 없었는지는 [docs/rationale.md#secrets](docs/rationale.md#secrets) 참조.
+`{ "slack_webhook_url": "..." }` 하나만 담는 flat 파일, `chmod 600`. `${CLAUDE_PLUGIN_DATA}`는 Claude Code가 관리하는 플러그인 영구 데이터 디렉토리 경로(`~/.claude/plugins/data/<plugin-id>/`)다. **스크립트가 이 경로를 `os.environ`으로 다시 읽지 않는다** — 대신 SKILL.md 콘텐츠 안에서 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 그대로 적어 스크립트에 인자로 넘긴다. 근거: [docs/rationale.md#secrets](docs/rationale.md#secrets).
 
 **`<data_path>/config.yaml` (사용자 RSS 소스 + 알림 백엔드)**
 
@@ -148,9 +146,9 @@ config.yaml의 sources 읽기 (비어 있으면 조기 종료 + 안내)
 
 ### articles.json / state.json 스키마 (기계 상태)
 
-`articles.json`은 수집 이력·중복 제거를 위한 저장소다. 메타데이터만 가볍게 유지하고, 메모 자체는 담지 않고 .md 파일 경로만 가리킨다. `summary`는 RSS 피드 자체의 `description` 필드를 그대로 쓰는 **알림 문구용 한 줄**이다(AI가 따로 생성하지 않음). Q&A·인터뷰에는 쓰지 않는다(요약은 손실 정보라 답변 품질을 떨어뜨림) — 그쪽은 항상 **원문**을 쓰며, 본문은 Q&A/메모를 처음 열 때 지연 fetch하고 세션 컨텍스트에만 남는다(디스크에 캐시하지 않아 무효화 규칙이 불필요해짐).
+`articles.json`은 수집 이력·중복 제거를 위한 저장소다. 메타데이터만 가볍게 유지하고, 메모 자체는 담지 않고 .md 파일 경로만 가리킨다. `summary`는 RSS 피드 자체의 `description` 필드를 그대로 쓰는 **알림 문구용 한 줄**이다(AI가 따로 생성하지 않음). Q&A·인터뷰에는 쓰지 않고 항상 **원문**을 쓰며, 본문은 Q&A/메모를 처음 열 때 지연 fetch하고 세션 컨텍스트에만 남는다(디스크에 캐시하지 않음).
 
-`state.json`은 수집 실행 자체의 상태(언제까지 수집했는지, 소스별 상태)만 최소로 유지한다. `consecutive_failures`가 3 이상이면 "죽은 소스"로 간주해 알림을 보낸다(`alerted`로 중복 방지, 딱 1회). 별도 알고리즘 없이 카운터 하나로 충분하다는 최소 상태 원칙을 따른다.
+`state.json`은 수집 실행 자체의 상태(언제까지 수집했는지, 소스별 상태)만 최소로 유지한다. `consecutive_failures`가 3 이상이면 "죽은 소스"로 간주해 알림을 보낸다(`alerted`로 중복 방지, 딱 1회).
 
 두 파일 모두 정확한 스키마는 [docs/conventions.md](docs/conventions.md) 참조.
 

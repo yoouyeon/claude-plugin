@@ -38,13 +38,13 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/update_index.py" "<DATA>"
 
 수집 시각을 물어본다 (기본 제안: 매일 09:00). OS는 `uname`으로 판별. **등록 커맨드를 사용자에게 먼저 보여주고 확인받은 뒤** 실행한다.
 
-실행 파일 경로를 먼저 확정해 커맨드에 절대경로로 박아 넣는다 — 로그인 비대화형 셸(`-lc`)은 `.zshrc`를 읽지 않아 PATH에 `claude`가 안 잡힐 수 있다:
+실행 파일 경로를 먼저 확정해 커맨드에 절대경로로 지정한다:
 
 ```bash
 command -v claude              # <CLAUDE_BIN>
 ```
 
-공통 실행 커맨드 — 데이터 경로는 인자로 넘기지 않는다. `data_path`는 `userConfig`로 저장돼 있어 헤드리스 `-p` 호출에서도 `${user_config.data_path}`가 그대로 해석된다:
+공통 실행 커맨드 — 데이터 경로는 인자로 넘기지 않는다:
 
 ```
 <CLAUDE_BIN> -p '/articles-os:collect' --allowedTools 'Bash,Task'

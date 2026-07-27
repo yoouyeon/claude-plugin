@@ -24,7 +24,7 @@ metadata:
 
 !`python3 -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).replace(microsecond=0).isoformat())"`
 
-위 값을 **RUN_TS**라 부른다. 아래에서 시각이 필요한 모든 지점 — 3단계에서 `apply_collection_results.py`에 전달하는 `<RUN_TS>` 하나(내부적으로 `last_success_at`·신규 아티클의 `collected_at`·`state.json.last_run`에 모두 재사용됨) — 은 전부 이 값을 그대로 쓴다.
+위 값을 **RUN_TS**라 부른다. 아래에서 시각이 필요한 모든 지점은 3단계에서 `apply_collection_results.py`에 전달하는 `<RUN_TS>` 하나를 그대로 쓴다.
 
 **각 단계에서 "현재 시각"을 새로 구하지 않는다.**
 
@@ -40,7 +40,7 @@ metadata:
 
 소스마다 `fetch-source` 에이전트(`articles-os:fetch-source`)를 **하나의 메시지에서 병렬로** 소환한다. 각 에이전트에 전달: 소스 `name`, `url`, 플러그인 루트 경로. 각 에이전트는 `{ok, source_name, source_url, entries}` 또는 `{ok: false, source_name, source_url, error}`를 반환한다 — 반환값을 그대로 배열로 모은다.
 
-**실패한 소스는 스킵하고 성공한 소스만으로 계속 진행한다 (부분 성공 허용).** 실패가 있어도 전체 실행을 멈추지 않는다.
+**실패한 소스는 스킵하고 성공한 소스만으로 계속 진행한다 (부분 성공 허용, 전체 실행 중단 없음).**
 
 ## 3. 병합·저장
 

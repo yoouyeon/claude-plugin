@@ -10,20 +10,20 @@ metadata:
 
 ## 권한 근거
 
-시크릿 저장은 사용자가 웹훅 URL을 붙여넣은 직후 같은 턴에서 검증까지 끝내야 하는 동기적 흐름이라, 서브에이전트로 위임하면 대화 왕복만 늘고 이득이 없다. 위험한 JSON 병합·파일 권한(`chmod 600`) 로직 자체는 `scripts/save_secret.py`로 분리했다.
+시크릿 저장은 웹훅 URL 붙여넣기 직후 같은 턴에서 검증까지 끝내야 하는 동기적 흐름이라 서브에이전트 위임 이득이 없다. 위험한 JSON 병합·파일 권한(`chmod 600`) 로직은 `scripts/save_secret.py`로 분리했다.
 
 # 알림 백엔드 설정
 
 `config.yaml`의 `notify` 섹션(백엔드 선택) + `${CLAUDE_PLUGIN_DATA}/secrets.json`(웹훅 시크릿) 관리.
 공통 규칙은 `${CLAUDE_PLUGIN_ROOT}/docs/conventions.md` 참조.
 
-`<DATA>` = `${user_config.data_path}`, `<PDATA>` = `${CLAUDE_PLUGIN_DATA}`. **반드시 이 두 자리표시자를 그대로 커맨드에 적는다** — 스크립트에 값을 미리 읽어서 넘기지 않는다(`os.environ`으로 다시 읽으면 세션에 같이 떠 있는 다른 플러그인의 hook이 남긴 값과 섞일 수 있음이 실측으로 확인됨. 상세: `${CLAUDE_PLUGIN_ROOT}/docs/rationale.md#secrets`).
+`<DATA>` = `${user_config.data_path}`, `<PDATA>` = `${CLAUDE_PLUGIN_DATA}`. **반드시 이 두 자리표시자를 그대로 커맨드에 적는다** — 스크립트에 값을 미리 읽어서 넘기지 않는다. 상세: `${CLAUDE_PLUGIN_ROOT}/docs/rationale.md#secrets`.
 
 ## 절차
 
 1. **데이터 폴더 확인**: `<DATA>/config.yaml`이 없으면 "먼저 `/articles-os:setup`을 실행하세요" 안내 후 종료.
 2. **현재 상태 표시**: `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" notify get <DATA>`로 현재 `backend`를 보여주고, Slack이면 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/save_secret.py" has <PDATA>`로 시크릿 존재 여부만 확인(URL 값 자체는 출력하지 않는다).
-3. **백엔드 선택**: `slack` 또는 `none`. 순수 터미널 전제라 데스크톱 알림 옵션은 없다.
+3. **백엔드 선택**: `slack` 또는 `none`.
 
 ### Slack 선택 시
 
