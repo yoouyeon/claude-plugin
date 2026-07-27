@@ -9,90 +9,57 @@
 
 ## 경로
 
-**홈 레벨 (`~/.articles-os/`)** — 설치 목록·시크릿·로그. 데이터가 아니라 이정표.
+**Claude Code 기존 인프라 (우리가 만드는 홈 디렉토리 없음)**
 
-| 파일 | 역할 | 권한 |
+| 위치 | 역할 | 권한 |
 |---|---|---|
-| `registry.json` | 이 머신의 설치 목록 | 기본 |
-| `secrets.json` | 웹훅 시크릿, `install_id` 키 | **600 필수** |
-| `logs/<install_id>.log` | 헤드리스 수집 로그 | 기본 |
+| `~/.claude/settings.json`의 `pluginConfigs[<plugin-id>].options.data_path` | 데이터 폴더 절대경로 (userConfig) | Claude Code 관리 |
+| `${CLAUDE_PLUGIN_DATA}/secrets.json` | 웹훅 시크릿 하나만, flat | **600 필수** |
 
-**데이터 폴더 (설치별, 레지스트리의 `path`)** — 사용자 영구 데이터.
+수집 실행 로그는 OS 스케줄러의 표준 출력 리다이렉션(launchd `StandardOutPath`/cron `>> ... 2>&1`)에 맡긴다 — 별도 로그 파일을 우리가 관리하지 않는다.
+
+**데이터 폴더 (`${user_config.data_path}`)** — 사용자 영구 데이터.
 
 ```
-<data-path>/
-├── config/
-│   ├── sources.yaml      # RSS 소스 목록 (초기: 비어 있음)
-│   └── notify.yaml       # 알림 백엔드 (시크릿 없음 — 커밋 안전)
-├── data/
-│   ├── articles.json     # 기계 상태: 수집 이력·중복 제거
-│   └── state.json        # last_run + 소스별 실패 상태
+<data_path>/
+├── config.yaml        # sources(RSS 목록, 초기: 비어 있음) + notify(백엔드, 시크릿 없음 — 커밋 안전)
+├── articles.json       # 기계 상태: 수집 이력·중복 제거
+├── state.json          # last_run + 소스별 실패 상태
 └── notes/
-    ├── index.md          # 메모 목차 (scripts/update_index.py 가 갱신)
+    ├── index.md        # 메모 목차 (scripts/update_index.py 가 갱신)
     └── YYYY-MM-DD-제목슬러그.md
 ```
 
-## 활성 설치 결정 규칙 (모든 대화형 스킬 공통)
+## 데이터 폴더 경로 (모든 스킬·에이전트 공통)
 
-```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/resolve_install.py"
-```
+`<DATA>` = `${user_config.data_path}` — 스킬·에이전트 콘텐츠에 이 자리표시자를 그대로 적으면 Claude Code가 실제 절대경로로 치환한다(대화형·헤드리스 `-p` 모두 동작). 별도 스크립트로 해석할 필요가 없다.
 
-출력의 `reason`에 따라:
-
-1. `cwd` — 현재 폴더가 어떤 설치 `path`의 하위 → 그 설치를 그대로 사용
-2. `single` — 설치가 하나뿐 → 그것 사용
-3. `multiple` — 후보 목록을 사용자에게 보여주고 선택 받기
-4. `none` — 설치 없음 → "먼저 `/articles-os:setup`을 실행하세요" 안내 (**자동 실행 금지**, 유도만)
-
-추가로 `sources.yaml`이 비어 있으면 `/articles-os:add-source`를 유도한다.
+- `<DATA>/config.yaml`이 없으면 → "먼저 `/articles-os:setup`을 실행하세요" 안내 (**자동 실행 금지**, 유도만)
+- 있지만 `sources`가 비어 있으면 → `/articles-os:add-source`를 유도한다.
 
 ## 파일 스키마
 
-### `~/.articles-os/registry.json`
+### `${CLAUDE_PLUGIN_DATA}/secrets.json` (chmod 600)
 
 ```json
-{
-  "installs": [
-    {
-      "install_id": "a1b2c3d4",
-      "path": "/abs/path/to/articles-os",
-      "label": "표시용 이름",
-      "scheduler_job_id": "com.articles-os.a1b2c3d4",
-      "created_at": "2026-07-14T09:00:00+09:00"
-    }
-  ]
-}
+{ "slack_webhook_url": "https://hooks.slack.com/..." }
 ```
 
-- `install_id`: 온보딩 1단계에서 생성하는 영구 식별자. `secrets.json`의 키. 스케줄러 작업이 재등록돼도 불변.
-- `scheduler_job_id`: launchd label 또는 cron 식별 주석. 4단계 전에는 `null`.
+`${CLAUDE_PLUGIN_DATA}`는 Claude Code가 관리하는 플러그인 영구 데이터 디렉토리 경로(`~/.claude/plugins/data/<plugin-id>/`)다. `save_secret.py`/`notify.py`는 이 경로를 **인자로만 받는다** — 스크립트 내부에서 `os.environ`으로 다시 읽지 않는다. 호출하는 SKILL.md가 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 커맨드에 그대로 적어 넘긴다(Claude Code가 그 스킬이 속한 플러그인 기준으로 정확히 치환). 이유: 세션에 다른 플러그인의 hook이 실행되면 그 값이 hook 프로세스 스코프를 넘어 일반 Bash 호출에도 남아, 엉뚱한 플러그인의 디렉토리를 가리키는 사고가 실측으로 확인됐다 — 상세: `docs/rationale.md#secrets`. 시크릿은 **오직 여기**. `config.yaml`·데이터 폴더·플러그인 디렉토리에 절대 두지 않는다.
 
-### `~/.articles-os/secrets.json` (chmod 600)
-
-```json
-{ "a1b2c3d4": { "slack_webhook_url": "https://hooks.slack.com/..." } }
-```
-
-시크릿은 **오직 여기**. `notify.yaml`·데이터 폴더·플러그인 디렉토리에 절대 두지 않는다.
-
-### `config/sources.yaml`
+### `config.yaml` (데이터 폴더 바로 밑)
 
 ```yaml
 sources:
   - name: 토스 기술블로그
     url: https://toss.tech/rss.xml
+notify:
+  backend: slack   # slack | none
 ```
 
-`name`은 표시용, `url`이 fetch 대상. 비어 있으면 수집은 조기 종료.
+`sources[].name`은 표시용, `url`이 fetch 대상. `sources`가 비어 있으면 수집은 조기 종료. `notify.backend`엔 시크릿이 없으므로 프로젝트째 커밋·동기화돼도 안전하다. 읽기·쓰기는 항상 `scripts/manage_config.py`를 통한다(직접 파싱하지 않는다).
 
-### `config/notify.yaml`
-
-```yaml
-backend: slack   # slack | none
-```
-
-### `data/articles.json`
+### `articles.json` (데이터 폴더 바로 밑)
 
 ```json
 {
@@ -116,7 +83,7 @@ backend: slack   # slack | none
 - `qa_log`: `[{ "asked_at": "...", "question": "...", "answer_digest": "..." }]`. 메모 저장 시 비운다.
 - 중복 판정은 `url` 기준.
 
-### `data/state.json`
+### `state.json` (데이터 폴더 바로 밑)
 
 ```json
 {
@@ -139,7 +106,7 @@ backend: slack   # slack | none
 파이프라인은 백엔드를 모른다. 항상 스크립트를 통해서만 보낸다:
 
 ```bash
-echo "<메시지 텍스트>" | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/notify.py" <data-path>
+echo "<메시지 텍스트>" | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/notify.py" <DATA> "${CLAUDE_PLUGIN_DATA}"
 ```
 
 - `backend: none`이면 스크립트가 조용히 스킵(exit 0).
@@ -172,7 +139,7 @@ Q/A 형태로 사용자 발화 중심 기록.
 메모 저장 후 반드시:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/update_index.py" <data-path>
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/update_index.py" <DATA>
 ```
 
 ## 원칙 요약

@@ -30,92 +30,86 @@
 
 ### 저장 위치 원칙 (배포 핵심)
 
-플러그인 설치 디렉토리는 **읽기 전용**으로 취급하고, 업데이트 시 덮어써질 수 있다. 따라서 사용자가 만든 데이터·설정·런타임 상태는 **전부 플러그인 밖 사용자 데이터 경로**에 저장한다. 이렇게 하지 않으면 플러그인 업데이트 때 사용자가 등록한 소스·수집 이력·메모가 통째로 사라진다.
+플러그인 설치 디렉토리는 **읽기 전용**으로 취급하고, 업데이트 시 덮어써질 수 있다. 따라서 사용자가 만든 데이터·설정·런타임 상태는 **전부 플러그인 밖**에 저장한다. 이렇게 하지 않으면 플러그인 업데이트 때 사용자가 등록한 소스·수집 이력·메모가 통째로 사라진다.
+
+새 디렉토리를 우리가 만들지 않고, Claude Code가 이미 관리하는 인프라(`userConfig`, `${CLAUDE_PLUGIN_DATA}`)에 얹는다. 근거: [docs/rationale.md#storage-location](docs/rationale.md#storage-location)
 
 ```
 <plugin>/                         # 배포물 (읽기 전용): 로직·스킬만
 └── skills, commands, manifest ...
 
-<user-data>/articles-os/          # 사용자 데이터 (영구): 사용자별 생성
-    ├── config/
-    │   ├── sources.yaml          # 사용자가 추가한 RSS 소스 (초기값: 비어 있음)
-    │   └── notify.yaml           # 알림 백엔드 선택 + 설정
-    ├── data/
-    │   ├── articles.json         # 기계 상태: 수집 이력·중복 제거·요약(RSS description 재사용)
-    │   └── state.json            # last-run 타임스탬프 등 실행 상태
-    └── notes/                    # 사람 산출물: 아티클당 메모 .md
-        ├── index.md             # 메모 목차 (필수, 메모 저장 시마다 자동 갱신)
+~/.claude/settings.json           # Claude Code 기존 인프라 (플러그인 userConfig 저장소)
+└── pluginConfigs["articles-os@..."].options.data_path   # 데이터 폴더 절대경로
+
+${CLAUDE_PLUGIN_DATA}/             # Claude Code 기존 인프라 (~/.claude/plugins/data/articles-os-.../)
+└── secrets.json                  # 웹훅 시크릿만, chmod 600
+
+<data_path>/                      # 사용자 데이터 (영구): userConfig로 지정된 경로
+    ├── config.yaml                # 사용자가 추가한 RSS 소스 + 알림 백엔드 선택 (초기값: sources 비어 있음)
+    ├── articles.json              # 기계 상태: 수집 이력·중복 제거·요약(RSS description 재사용)
+    ├── state.json                 # last-run 타임스탬프 등 실행 상태
+    └── notes/                     # 사람 산출물: 아티클당 메모 .md
+        ├── index.md              # 메모 목차 (필수, 메모 저장 시마다 자동 갱신)
         └── YYYY-MM-DD-제목슬러그.md
 ```
 
 **역할 분리 원칙:** 기계가 읽는 상태(json)와 사람이 두고 보는 산출물(md)을 섞지 않는다. 학습 메모를 json 안에 파묻으면 나중에 꺼내 보거나 다른 에디터(Obsidian 등)에서 열기 나쁘다. 메모는 이식성 좋은 .md로, articles.json은 그 메모의 존재/경로만 가리킨다.
+
+`config.yaml`(사람이 편집하는 설정: sources/notify)과 `articles.json`/`state.json`(기계가 매일 갱신하는 상태)을 굳이 서브폴더로 나누지 않는다 — 파일 4개뿐이라 폴더 depth가 주는 정보량보다 탐색 비용이 크다. `articles.json`과 `state.json`은 반대로 **분리를 유지**한다 — 전자는 계속 쌓이는 이력(커질 수 있음), 후자는 매 실행마다 갱신되는 작은 실행 상태라 합치면 매일 실행마다 전체 이력을 다시 읽고 쓰게 되어 크기·쓰기 빈도가 안 맞는다.
 
 ### 온보딩 (필수)
 
 기본 소스가 없으므로 설치 직후엔 수집할 것이 없다. 아래 순서를 밟지 않으면 플러그인이 "동작 안 함"으로 보인다.
 
 ```
-1. 데이터 경로 지정 → 사용자 데이터 폴더 절대경로 확정 (기본 제안: `./articles-os`), 이때 설치 고유 ID(`install_id`) 생성
-2. 소스 추가       → sources.yaml 에 RSS 등록 (필수 스킬, 선택 기능 아님)
-3. 알림 연결       → notify.yaml 에 백엔드 선택 (Slack 웹훅이 사실상 유일한 실용 옵션,
+0. 데이터 폴더 지정 → 플러그인 활성화 시 Claude Code가 자동으로 물어봄 (userConfig, 기본 제안: `./articles-os`)
+1. 소스 추가       → config.yaml 에 RSS 등록 (필수 스킬, 선택 기능 아님)
+2. 알림 연결       → config.yaml 에 백엔드 선택 (Slack 웹훅이 사실상 유일한 실용 옵션,
                      데스크톱 알림은 지원 안 함 — 순수 터미널 전제)
-4. 스케줄 등록     → OS 스케줄러(macOS: launchd 우선/cron, Linux: cron)에 헤드리스 수집 명령 등록
+3. 스케줄 등록     → OS 스케줄러(macOS: launchd 우선/cron, Linux: cron)에 헤드리스 수집 명령 등록
 ```
+
+0단계는 `setup` 스킬이 다루지 않는다 — 플러그인 매니페스트의 `userConfig` 선언으로 Claude Code가 활성화 시점에 자동으로 프롬프트한다. 근거: [docs/rationale.md#user-config](docs/rationale.md#user-config)
 
 ### 설정 스킬 (온보딩 + 재설정)
 
 설정은 "온보딩 1개 스킬 + 개별 재실행 진입점"으로 구성한다. 소스는 자주 추가되고, 알림은 가끔 바뀌며, 스케줄은 최초 1회뿐이라 **수명이 달라서** 재실행 단위를 쪼갠다.
 
-- **`setup` (온보딩):** 최초 설치 직후 4단계를 순차 안내 — 데이터 경로 지정(+ `install_id` 생성) → 소스 추가 → 알림 연결 → 스케줄 등록. 그리고 `articles.json` / `state.json` 초기화.
-- **`add-source` (재실행 진입점):** `sources.yaml`에 RSS 추가/삭제. 온보딩과 로직 공유, 단독 호출 가능.
-- **`notify-config` (재실행 진입점):** `notify.yaml` 백엔드 변경. 단독 호출 가능.
+- **`setup` (온보딩):** 데이터 폴더 초기화(`config.yaml`/`articles.json`/`state.json`/`notes/` 생성) 후 3단계를 순차 안내 — 소스 추가 → 알림 연결 → 스케줄 등록.
+- **`add-source` (재실행 진입점):** `config.yaml`의 `sources`에 RSS 추가/삭제. 온보딩과 로직 공유, 단독 호출 가능.
+- **`notify-config` (재실행 진입점):** `config.yaml`의 `notify.backend` 변경. 단독 호출 가능.
 
-#### 데이터 경로 결정 (사용자 지정 + 스케줄러 이식성)
+#### 데이터 폴더 경로 (userConfig)
 
-수집은 매일 1회 **사용자 없이 백그라운드로** 돈다. 그러려면 데이터 폴더 위치를 사람 없이도 결정적으로 알아내야 하는데, `claude`를 어느 프로젝트에서 실행하느냐에 따라 "현재 폴더"(cwd)가 매번 달라진다. 따라서 "지금 폴더에 저장"은 다음 실행 때 그 폴더를 못 찾는다.
+수집은 매일 1회 **사용자 없이 백그라운드로** 돈다. 그러려면 데이터 폴더 위치를 사람 없이도 결정적으로 알아내야 한다. 이걸 플러그인 매니페스트의 `userConfig(type: directory)` 필드 하나로 해결한다 — Claude Code가 값을 `~/.claude/settings.json`에 저장하고, 스킬 콘텐츠의 `${user_config.data_path}` 자리를 실제 경로로 치환해준다. 이 치환은 대화형 세션은 물론 **OS 스케줄러의 헤드리스 `-p` 호출에서도 동일하게 동작**한다(실측 확인 완료).
 
-해법: **위치는 사용자가 고르되(눈에 보이는 곳·프로젝트 단위), 고른 절대경로를 스케줄 작업이 들고 다니게** 한다.
+그 결과 사라진 것들:
 
-- 온보딩이 **`./articles-os`(현재 프로젝트 폴더)를 기본 제안**하고, 사용자는 다른 경로 입력 가능.
-- 확정된 절대경로를 두 곳에 기록:
-  - **cron/launchd 작업의 커맨드라인 자체**에 박음(예: `claude -p "articles-os 수집 실행: /Users/.../articles-os"`) → 매일 도는 프로세스가 자기 커맨드에서 경로를 읽음 (홈 고정 불필요).
-  - **홈 레지스트리 `~/.articles-os/registry.json`** → 설치 "목록"을 관리하는 한 줄짜리 이정표(데이터 아님). 대화형 스킬이 매번 안 묻고 활성 설치를 찾게 해줌.
-
-#### 설치 범위 (프로젝트별 여러 벌)
-
-한 머신에 프로젝트별로 여러 벌 설치 가능. 레지스트리의 각 항목은 `{ install_id, path, label, scheduler_job_id, created_at }`.
-
-이때 생기는 유일한 복잡성은 **"대화형 스킬이 어느 설치를 쓸지 고르는 규칙"**이며, 결정적으로 푼다:
-
-1. 현재 cwd가 어떤 설치 `path`의 하위면 → 그 설치 (프로젝트 안에서 부르면 그 프로젝트 것).
-2. 아니고 설치가 하나뿐이면 → 그거.
-3. 여러 개인데 밖에서 불렀으면 → 목록을 보여주고 선택.
+- **cwd 기반 추정이 불필요.** 예전엔 "현재 폴더에 저장"이 스케줄 실행 시 cwd가 매번 달라져 문제였는데, `userConfig` 값은 cwd와 무관하게 고정 저장된다.
+- **활성 설치를 고르는 판별 로직 자체가 불필요.** 플러그인당 스코프당 `userConfig` 값은 하나뿐이라 "여러 설치 중 어느 걸 쓸지" 문제가 성립하지 않는다. (이전엔 한 머신에 프로젝트별로 여러 벌 설치하는 시나리오를 대비해 홈 레지스트리 + cwd/단일/다중 판별 로직을 뒀으나, 실제 요구가 아니었다.)
+- **스케줄 작업 커맨드라인에 절대경로를 박아 넣을 필요가 없음.** `claude -p '/articles-os:collect'`처럼 고정 커맨드만 등록하면 된다 — `${user_config.data_path}`가 헤드리스 실행에서도 해석되기 때문.
 
 #### 스케줄 등록 (자동 + 확인)
 
-설정 스킬이 OS 스케줄러에 **직접 등록**(매일 1회)하되 등록 전 사용자 확인을 받는다 — macOS는 `~/Library/LaunchAgents/com.articles-os.<install_id>.plist` 작성 후 `launchctl load`, Linux는 `crontab`에 한 줄 추가. 온보딩 목적이 "설치 직후 바로 동작"인데 사용자가 등록을 손수 걸어야 하면 4단계가 반쯤 수동으로 남아 "동작 안 함"처럼 보인다.
+설정 스킬이 OS 스케줄러에 **직접 등록**(매일 1회)하되 등록 전 사용자 확인을 받는다 — macOS는 `~/Library/LaunchAgents/com.articles-os.plist` 작성 후 `launchctl load`, Linux는 `crontab`에 한 줄 추가. 온보딩 목적이 "설치 직후 바로 동작"인데 사용자가 등록을 손수 걸어야 하면 마지막 단계가 반쯤 수동으로 남아 "동작 안 함"처럼 보인다. 수집 실행 로그는 launchd의 `StandardOutPath`/`StandardErrorPath` 또는 cron의 `>> ... 2>&1` 리다이렉션에 맡긴다 — 별도 로그 관리 코드를 만들지 않는다.
 
 #### 진입 (자동 감지 + 유도)
 
-수집·브라우징 등 다른 스킬이 **레지스트리에 활성 설치가 없거나 `sources.yaml`이 비었음을 감지**하면 "먼저 설정하세요"로 `setup`을 유도한다. 기본 소스가 없어 설치 직후 "동작 안 함"으로 보이는 문제를 막는다. (자동 유도이되 자동 실행은 아님 — 사용자가 의도치 않게 설정 플로우에 빠지지 않도록.)
+수집·브라우징 등 다른 스킬이 **`<data_path>/config.yaml`이 없거나 `sources`가 비었음을 감지**하면 "먼저 설정하세요"로 `setup`(또는 `add-source`)을 유도한다. 기본 소스가 없어 설치 직후 "동작 안 함"으로 보이는 문제를 막는다. (자동 유도이되 자동 실행은 아님 — 사용자가 의도치 않게 설정 플로우에 빠지지 않도록.)
 
 #### 설정·상태 파일 스키마
 
-**`~/.articles-os/registry.json` (홈, 설치 목록 이정표)**
+**`~/.claude/settings.json` (Claude Code 기존 인프라)**
 
-데이터가 아니라 "이 머신에 어떤 설치가 있나"만 가리키는 홈 레벨 이정표. 대화형 스킬이 활성 설치를 여기서 찾는다(선택 규칙: cwd 하위 → 단일 → 목록). 각 항목이 데이터 폴더 절대경로 + `install_id` + OS 스케줄러 작업 식별자를 가리킨다.
+`pluginConfigs["articles-os@<marketplace>"].options.data_path`에 데이터 폴더 절대경로가 저장된다. 우리가 직접 관리하는 파일이 아니라 Claude Code의 `userConfig` 메커니즘이 읽고 쓴다.
 
-`install_id`는 1단계(데이터 경로 지정)에서 생성하는 영구 식별자이며 secrets.json의 키로 쓰인다. 3단계(알림 연결)가 4단계(스케줄 등록)보다 먼저 올 수 있어 그 시점엔 `scheduler_job_id`가 아직 없을 수 있으므로, 시크릿 키는 스케줄러 식별자가 아니라 1단계부터 항상 존재하는 `install_id`에 고정한다. 부수 이득: cron/launchd 작업을 지웠다 재등록해 `scheduler_job_id`가 바뀌어도 저장된 웹훅 시크릿은 끊기지 않는다.
+**`${CLAUDE_PLUGIN_DATA}/secrets.json` (Claude Code 기존 인프라, 웹훅 시크릿)**
 
-실제 스키마는 [docs/conventions.md](docs/conventions.md) 참조.
+`{ "slack_webhook_url": "..." }` 하나만 담는 flat 파일, `chmod 600`. `${CLAUDE_PLUGIN_DATA}`는 Claude Code가 관리하는 플러그인 영구 데이터 디렉토리 경로(`~/.claude/plugins/data/<plugin-id>/`)다. **스크립트가 이 경로를 `os.environ`으로 다시 읽지 않는다** — 세션에 다른 플러그인의 hook이 실행되면 그 값이 hook 프로세스 스코프를 넘어 일반 Bash 호출에도 남아, 엉뚱한 플러그인의 디렉토리를 가리키는 사고가 실측으로 확인됐다(다른 플러그인의 `secrets.json`을 덮어쓴 사례). 대신 SKILL.md 콘텐츠 안에서 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 그대로 적어 스크립트에 인자로 넘긴다 — 이 치환은 Claude Code가 그 스킬이 속한 플러그인 기준으로 정확히 스코프해준다. 왜 이 경로인지, 왜 `userConfig`로 웹훅까지 대체할 수 없었는지는 [docs/rationale.md#secrets](docs/rationale.md#secrets) 참조.
 
-**`<user-data>/articles-os/config/sources.yaml` (사용자 RSS 소스)**
+**`<data_path>/config.yaml` (사용자 RSS 소스 + 알림 백엔드)**
 
-수집이 매일 훑을 피드 목록. 배포물엔 비어 있고 온보딩/`add-source`가 채운다. 수집 파이프라인 첫 단계가 이 파일을 읽고, 비었으면 조기 종료한다. 스키마는 [docs/conventions.md](docs/conventions.md) 참조.
-
-**`<user-data>/articles-os/config/notify.yaml` (알림 백엔드)**
-
-`notify(신규목록)`이 실제로 어디로 쏘는지 정하는 설정. 파이프라인은 백엔드를 모르고 이 파일만 본다(알림 추상화). Slack 웹훅이 기본이자 사실상 유일한 실용 옵션이고, `none`도 가능(순수 터미널 전제라 데스크톱 알림 옵션은 없음). `backend` 변경이 `notify-config` 진입점의 역할. notify.yaml엔 시크릿이 없으므로 프로젝트째 커밋·동기화돼도 안전하다. 스키마는 [docs/conventions.md](docs/conventions.md) 참조.
+수집이 매일 훑을 피드 목록(`sources`)과 알림 백엔드 선택(`notify.backend`)을 한 파일에 담는다. 배포물엔 `sources`가 비어 있고 온보딩/`add-source`가 채운다. 수집 파이프라인 첫 단계가 이 파일을 읽고, `sources`가 비었으면 조기 종료한다. `notify(신규목록)`은 백엔드를 모르고 이 파일의 `notify.backend`만 본다(알림 추상화). Slack 웹훅이 기본이자 사실상 유일한 실용 옵션이고, `none`도 가능(순수 터미널 전제라 데스크톱 알림 옵션은 없음). 시크릿이 없으므로 프로젝트째 커밋·동기화돼도 안전하다. 스키마는 [docs/conventions.md](docs/conventions.md) 참조.
 
 #### 알림 온보딩 흐름 (백엔드 + 시크릿 입력)
 
@@ -124,20 +118,16 @@
 ```
 1. 백엔드로 Slack 선택
 2. "Slack Incoming Webhook URL 붙여넣기" 안내 (사용자가 Slack 앱 설정에서 발급)
-3. 입력값을 홈 시크릿 파일 ~/.articles-os/secrets.json 에 `install_id` 키로 저장 (notify.yaml엔 안 넣음)
+3. 입력값을 `${CLAUDE_PLUGIN_DATA}/secrets.json` 에 저장 (config.yaml엔 안 넣음) — 스킬이 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 스크립트에 인자로 넘겨서 처리, 환경변수 재조회 아님
 4. 저장 후 테스트 알림 1회로 검증 + "웹훅은 언제든 Slack에서 폐기·재발급 가능" 안내
 ```
 
 `backend: none`을 고르면 웹훅 입력 단계는 건너뛴다.
 
-#### 웹훅 시크릿 저장 (홈 분리 + `600`)
-
-**결정:** 웹훅은 프로젝트 데이터 폴더(`notify.yaml`)가 아니라 **홈 시크릿 파일 `~/.articles-os/secrets.json`에 `install_id` 키로 저장**, 파일 권한 `600`(스키마: [docs/conventions.md](docs/conventions.md)). 데이터 폴더 기본값이 `./articles-os`(프로젝트 안)라 시크릿을 거기 두면 git 커밋·클라우드 동기화에 딸려 나갈 수 있어, 새어나갈 위치에 아예 두지 않는 구조적 방어를 택했다. `.gitignore`·키체인 대비 비교 및 위협 모델 상세: [docs/rationale.md#secrets](docs/rationale.md#secrets)
-
 ### 수집 파이프라인 (매일 1회, OS 스케줄러가 헤드리스로 기동)
 
 ```
-sources.yaml 읽기 (비어 있으면 조기 종료 + 안내)
+config.yaml의 sources 읽기 (비어 있으면 조기 종료 + 안내)
     → 소스별 서브에이전트 병렬 실행
         → RSS fetch + 파싱 (실패 시 에러로 반환 — 전체 실행을 막지 않음)
     → 성공한 소스만 결과 merge (실패 소스는 스킵, 부분 성공 허용)
@@ -181,7 +171,7 @@ sources.yaml 읽기 (비어 있으면 조기 종료 + 안내)
 
 ### 알림 추상화
 
-파이프라인은 `notify(신규목록)` 인터페이스만 호출하고, 실제 백엔드는 `notify.yaml`에서 고른다. 웹훅 URL 등 시크릿은 배포물에 넣지 않고 온보딩 때 사용자가 입력한다.
+파이프라인은 `notify(신규목록)` 인터페이스만 호출하고, 실제 백엔드는 `config.yaml`의 `notify.backend`에서 고른다. 웹훅 URL 등 시크릿은 배포물에 넣지 않고 온보딩 때 사용자가 입력한다.
 
 ### 마켓플레이스 매니페스트
 

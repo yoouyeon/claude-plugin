@@ -16,13 +16,13 @@ RSS 기반 기술 아티클 학습 파이프라인 플러그인. 매일 아티�
 /articles-os:setup
 ```
 
-온보딩이 4단계를 안내한다: 데이터 경로 지정 → RSS 소스 추가 → 알림 연결(Slack Incoming Webhook) → 일일 수집 스케줄 등록(macOS launchd / Linux cron). 기본 소스는 없다 — 소스를 추가해야 동작한다.
+플러그인 활성화 시 Claude Code가 데이터 폴더 경로를 먼저 물어본다(기본 제안: `./articles-os`). 이어서 `setup` 온보딩이 3단계를 안내한다: RSS 소스 추가 → 알림 연결(Slack Incoming Webhook) → 일일 수집 스케줄 등록(macOS launchd / Linux cron). 기본 소스는 없다 — 소스를 추가해야 동작한다.
 
 ## 스킬
 
 | 스킬 | 역할 |
 |---|---|
-| `/articles-os:setup` | 온보딩 (최초 1회, 4단계) |
+| `/articles-os:setup` | 온보딩 (최초 1회, 3단계) |
 | `/articles-os:add-source` | RSS 소스 추가/삭제 |
 | `/articles-os:notify-config` | 알림 백엔드 변경 (slack / none) |
 | `/articles-os:collect` | 수집 파이프라인 (스케줄러가 매일 호출, 수동 실행도 가능) |
@@ -34,10 +34,11 @@ RSS 기반 기술 아티클 학습 파이프라인 플러그인. 매일 아티�
 
 ## 데이터 저장 위치
 
-플러그인 디렉토리는 읽기 전용이다. 사용자 데이터는 전부 밖에 저장된다:
+플러그인 디렉토리는 읽기 전용이다. 사용자 데이터는 전부 밖에 저장되고, 새로 만드는 홈 디렉토리는 없다 — Claude Code가 이미 관리하는 인프라 위에 얹는다:
 
-- **데이터 폴더** (온보딩에서 지정, 기본 `./articles-os`): 소스·알림 설정, 수집 이력, 학습 메모(.md)
-- **`~/.articles-os/`**: 설치 레지스트리, 웹훅 시크릿(`secrets.json`, chmod 600), 수집 로그
+- **데이터 폴더** (플러그인 활성화 시 지정, 기본 `./articles-os`): 소스·알림 설정(`config.yaml`), 수집 이력, 학습 메모(.md)
+- **`~/.claude/settings.json`**: 데이터 폴더 경로 (Claude Code의 플러그인 설정 저장소)
+- **`${CLAUDE_PLUGIN_DATA}`**: 웹훅 시크릿(`secrets.json`, chmod 600) — Claude Code가 관리하는 플러그인 영구 데이터 디렉토리
 
 메모는 이식성 있는 순수 마크다운이라 Obsidian 등 어느 에디터에서도 열린다. 시크릿은 데이터 폴더에 두지 않으므로 프로젝트를 git 커밋해도 새지 않는다.
 
@@ -49,5 +50,5 @@ RSS 기반 기술 아티클 학습 파이프라인 플러그인. 매일 아티�
 
 ## 스케줄 해제
 
-- macOS: `launchctl unload ~/Library/LaunchAgents/com.articles-os.<install_id>.plist && rm` 해당 plist
-- Linux: `crontab -e`에서 `# articles-os:<install_id>` 주석이 붙은 줄 제거
+- macOS: `launchctl unload ~/Library/LaunchAgents/com.articles-os.plist && rm` 해당 plist
+- Linux: `crontab -e`에서 `# articles-os` 주석이 붙은 줄 제거

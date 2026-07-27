@@ -25,14 +25,40 @@ Claude Code가 제공하는 세 가지 옵션(Cloud Routines·Desktop scheduled 
 
 Windows Task Scheduler는 1차 범위에서 제외한다 — 시크릿 파일 권한 모델이 POSIX `chmod 600`과 달라 동일한 방식으로 이식할 수 없다.
 
+## storage-location
+
+우리가 직접 만드는 홈 레벨 디렉토리(`~/.articles-os/` 같은 것)를 전부 없애고, Claude Code가 이미 관리하는 인프라(`userConfig`, `${CLAUDE_PLUGIN_DATA}`)에 얹기로 한 결정의 배경.
+
+기존엔 설치 여러 벌을 지원한다는 전제로 홈 레지스트리(`registry.json`)·`install_id`·`resolve_install.py`의 cwd/단일/다중 판별 로직을 만들었다. 하지만 실사용 시나리오를 다시 짚어보니 "한 머신에 프로젝트별로 여러 벌 설치"는 실제 요구가 아니라 "혹시 몰라서" 넣어둔 가정이었다 — 보통 머신의 주인은 한 명이고, articles-os는 그 한 명의 개인 학습 파이프라인이다. 이 가정을 걷어내자 레지스트리·판별 로직 전체가 통째로 불필요해졌다.
+
+그 자리를 대체한 것이 Claude Code 플러그인 매니페스트의 `userConfig` 필드다(`type: directory`) — 플러그인 활성화 시 Claude Code가 값을 물어보고 `~/.claude/settings.json`(이미 존재하는 파일)의 `pluginConfigs[<plugin-id>].options`에 저장하며, 스킬·에이전트 콘텐츠의 `${user_config.data_path}` 자리를 실제 경로로 치환해준다. 로컬 테스트 플러그인으로 직접 검증한 결과:
+
+- `--plugin-dir`로 임시 로드했을 땐 치환이 되지 않았다 — 값이 실제로 `pluginConfigs`에 기록되지 않았기 때문으로 보인다.
+- 마켓플레이스를 통해 정식 설치(`claude plugin install`)한 뒤에는 대화형 세션은 물론 **헤드리스 `-p` 호출에서도** `${user_config.data_path}`가 실제 경로로 정확히 치환됐다.
+- `CLAUDE_PLUGIN_OPTION_<KEY>` 환경변수는 hook/MCP/LSP 서브프로세스에만 전달되고, 스킬 지침이 시키는 일반 Bash 호출에는 전달되지 않는다(실측 확인).
+- `${CLAUDE_PLUGIN_DATA}`(플러그인 영구 데이터 디렉토리 경로)도 일반 Bash 호출의 `os.environ`으로 읽으면 **안전하지 않다** — 세션에 다른 플러그인의 hook(예: SessionStart/Stop hook)이 실행되면 그 값이 hook 프로세스 스코프를 넘어 일반 Bash 호출의 환경에도 남는다. 실제로 로컬 마켓플레이스 설치본으로 종단 테스트하던 중 이 문제를 직접 겪었다 — `save_secret.py`가 `os.environ.get("CLAUDE_PLUGIN_DATA")`로 읽은 값이 articles-os 자신의 디렉토리가 아니라 같은 세션에 활성화돼 있던 다른 플러그인(hook을 매 턴 실행하는 플러그인)의 디렉토리를 가리켰고, 그 결과 테스트 웹훅 값이 **그 플러그인의 실제 `secrets.json`을 덮어썼다**. 이 사고 이후 스크립트가 `${CLAUDE_PLUGIN_DATA}`를 환경변수로 다시 읽는 방식을 폐기하고, 호출하는 SKILL.md가 이 플레이스홀더를 텍스트로 치환한 값을 **명시적 CLI 인자**로 넘기도록 고쳤다 — `${user_config.*}` 치환과 동일한 안전한 경로(스킬 콘텐츠 안에서 Claude Code가 그 스킬 소속 플러그인 기준으로 정확히 스코프)를 타기 때문에 이 문제가 재발하지 않는다.
+
+이 실측 결과가 시크릿 저장 위치 결정([#secrets](#secrets))의 근거이기도 하다.
+
+## user-config
+
+데이터 폴더 경로를 `userConfig(type: directory)`로 옮기면서 자연히 정리된 것들:
+
+- **스케줄러 커맨드에 절대경로를 박아 넣던 관행 폐기.** 기존엔 "헤드리스 실행은 cwd를 상속받지 못한다"는 이유로 `claude -p '/articles-os:collect <절대경로>'`처럼 커맨드 자체에 경로를 심었다. `userConfig` 치환이 헤드리스에서도 동작함을 확인했으므로 `claude -p '/articles-os:collect'`(인자 없음)로 충분하다.
+- **`setup` 스킬의 4단계 중 1단계(데이터 경로 지정)가 사라짐.** Claude Code가 플러그인 활성화 시점에 자동으로 프롬프트하므로, `setup`은 남은 3단계(소스·알림·스케줄)만 다룬다.
+- **"활성 설치가 없는 상태" 감지 방식이 바뀜.** 예전엔 레지스트리가 비어 있는지(`resolve_install.py`의 `none`)로 판단했지만, `data_path`엔 항상 기본값(`./articles-os`)이 있어 이 신호로 못 쓴다. 대신 "그 경로에 `config.yaml`이 있는지"로 판단한다 — 애초에 온보딩 완료 여부는 항상 이 파일의 존재·내용으로 판별해왔으므로 실질적으로 달라지는 건 없다.
+
 ## secrets
 
-웹훅 시크릿을 프로젝트 데이터 폴더가 아니라 홈(`~/.articles-os/secrets.json`)에 분리해 저장하는 결정의 전체 배경.
+웹훅 시크릿을 `${CLAUDE_PLUGIN_DATA}/secrets.json`(Claude Code가 관리하는 플러그인 영구 데이터 디렉토리)에 저장하기로 한 결정의 전체 배경.
 
-**위협 모델:** Slack Incoming Webhook URL은 "URL을 아는 사람이 그 채널에 글을 쓸 수 있는" bearer 시크릿이나 심각도는 낮다(한 채널 쓰기 한정, 유출 시 Slack에서 즉시 폐기·재발급 가능). 따라서 현실적 위협은 정교한 공격자가 아니라 **실수 유출**이고, 우리 설계에선 경로가 뚜렷하다 — 데이터 폴더 기본값이 `./articles-os`(프로젝트 안)라 사용자가 프로젝트를 git 커밋하거나 Dropbox/iCloud로 동기화하면 시크릿이 딸려 나간다.
+**왜 `userConfig`로 못 넣나:** `userConfig`의 `sensitive: true` 필드는 스킬·에이전트 콘텐츠에 절대 치환되지 않는다(실측 확인 — 값을 설정해도 항상 "not available in skill content"만 반환됨). 우리 알림 발송(`notify.py`)은 hook이 아니라 **스킬 지침이 시키는 일반 Bash 호출**이라, `userConfig`가 시크릿을 전달할 수 있는 유일한 경로(hook 프로세스의 `CLAUDE_PLUGIN_OPTION_<KEY>` 환경변수)를 애초에 타지 못한다. 그래서 시크릿만은 별도 저장이 필요하다.
 
-**결정:** 시크릿을 프로젝트 밖 홈으로 분리한다. 이는 "빼먹지 말라고 표시"하는 방식이 아니라 **시크릿을 새어나갈 위치에 아예 두지 않는 구조적 방어**다.
+**위협 모델:** Slack Incoming Webhook URL은 "URL을 아는 사람이 그 채널에 글을 쓸 수 있는" bearer 시크릿이나 심각도는 낮다(한 채널 쓰기 한정, 유출 시 Slack에서 즉시 폐기·재발급 가능).
 
-- **`.gitignore` 대비 우위:** gitignore는 git만 커버하고(동기화·zip 못 막음), 올바른 설정에 의존하며, 한 번 커밋되면 히스토리에 영구 잔존, 남의 프로젝트 gitignore를 건드려야 해 침투적이다. 홈 분리는 이 모든 실수 경로와 무관하다. (원하면 데이터 폴더 기계 상태 파일 제외용으로 gitignore를 *보조*로 얹을 순 있으나, 시크릿 1차 방어선은 홈 분리다.)
-- **키체인/OS 시크릿 매니저 대비:** 이식성(macOS `security` vs Linux libsecret, 헤드리스엔 시크릿 서비스 부재)과 헤드리스 접근(잠긴 키체인 프롬프트) 리스크가 있어 낮은 심각도 시크릿엔 과하다. 파일 분리 + `600`이 적정선.
-- **헤드리스 수집:** 매일 도는 작업은 홈 파일을 그냥 읽으면 되므로 접근 문제 없음.
+**검토한 옵션과 결정:**
+
+- **우리 소유의 홈 디렉토리(예 `~/.articles-os/secrets.json`):** 동작은 하지만 "새 관리 포인트를 늘리고 싶지 않다"는 요구와 어긋난다 — 우리가 만들고 우리가 지워야 하는 디렉토리가 하나 더 생긴다.
+- **OS 키체인(macOS `security` / Linux `libsecret`) 직접 호출:** 디렉토리 자체는 없앨 수 있지만, macOS/Linux 이원화 구현과 헤드리스 실행 시 키체인 잠금 프롬프트 리스크를 새로 짊어져야 한다. 남는 이득 대비 구현 비용이 안 맞는다.
+- **`${CLAUDE_PLUGIN_DATA}/secrets.json` (채택, 단 전달 방식에 주의):** 새 디렉토리를 만들지 않는다 — Claude Code가 이미 관리하는 `~/.claude/plugins/data/<plugin-id>/` 트리 밑에 얹는다. 처음엔 스크립트가 이 경로를 `os.environ`으로 직접 읽도록 구현했다가, 종단 테스트에서 다른 플러그인의 hook이 남긴 값과 섞여 그 플러그인의 실제 시크릿을 덮어쓰는 사고를 겪었다([#storage-location](#storage-location)). 수정: 스크립트는 이 경로를 **인자로만** 받고, 호출하는 SKILL.md가 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 그대로 커맨드에 적어 넘긴다 — 이 치환은 Claude Code가 스킬 소속 플러그인 기준으로 정확히 스코프하므로 안전하다. 캐치: 플러그인을 마지막 스코프에서 제거하면 이 디렉토리도 함께 삭제된다 — 다만 위협 모델상 웹훅은 낮은 심각도·즉시 재발급 가능이라 이 트레이드오프를 받아들였다(다른 사용자 데이터 — 소스·수집 이력·메모 — 는 이 디렉토리에 두지 않으므로 영향 없음).
+- **`.gitignore` 대비 우위(참고, 기존 판단 유지):** gitignore는 git만 커버하고(동기화·zip 못 막음), 올바른 설정에 의존하며, 한 번 커밋되면 히스토리에 영구 잔존한다. 시크릿을 애초에 프로젝트 데이터 폴더에 두지 않는 구조적 방어가 gitignore보다 낫다는 판단은 그대로 유지된다.
