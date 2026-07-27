@@ -18,7 +18,7 @@ color: blue
 tools: ["Read", "Grep", "Glob", "Bash"]
 ---
 
-`notes/` 전체 검색 + 관련 메모 연결을 담당한다. 전달받는 것: 데이터 폴더 경로(없으면 `resolve_install.py`로 결정), 검색 주제/질의.
+`notes/` 전체 검색 + 관련 메모 연결을 담당한다. 전달받는 것: 데이터 폴더 경로(`${user_config.data_path}`), 검색 주제/질의.
 
 **절차:**
 

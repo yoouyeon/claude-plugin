@@ -20,7 +20,7 @@ tools: ["Bash"]
 
 소스 헬스 리포트를 담당한다. **네트워크 재확인 없음** — 로컬 집계만. 집계·분류는 `scripts/source_healthcheck.py`가 전담한다 — 그 출력을 해석·표시만 한다.
 
-데이터 폴더 경로를 전달받는다. 없으면 `python3 "<플러그인 루트>/scripts/resolve_install.py"`로 결정한다.
+데이터 폴더 경로(`${user_config.data_path}`)를 전달받는다.
 
 **절차:**
 

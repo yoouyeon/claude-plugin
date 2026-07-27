@@ -3,7 +3,7 @@ name: collect
 description: >
   This skill should be used when the user asks to "collect articles", "수집 실행",
   "아티클 수집해줘", "지금 수집 돌려줘", or when invoked headlessly by the OS scheduler
-  as `/articles-os:collect <data-path>`. Orchestrates the daily RSS collection pipeline:
+  as `/articles-os:collect`. Orchestrates the daily RSS collection pipeline:
   parallel fetch, dedupe, state update, and notification.
 metadata:
   version: "0.1.0"
@@ -11,7 +11,7 @@ metadata:
 
 ## 권한 근거
 
-이 스킬은 OS 스케줄러가 헤드리스로 호출하는 진입점이다. 실제로 쓰는 도구는 `Bash`(스크립트 호출)와 `Task`(fetch-source 병렬 소환) 뿐이다 — 소스 읽기·상태 갱신·dedup·저장이 전부 스크립트(`manage_sources.py`, `apply_collection_results.py`)로 위임되어 있어 Read/Write/Edit/Grep/WebFetch/WebSearch가 필요 없다. 헤드리스 커맨드의 `--allowedTools`는 `setup/SKILL.md`에서 `'Bash,Task'`로 좁혀 생성한다.
+이 스킬은 OS 스케줄러가 헤드리스로 호출하는 진입점이다. 실제로 쓰는 도구는 `Bash`(스크립트 호출)와 `Task`(fetch-source 병렬 소환) 뿐이다 — 소스 읽기·상태 갱신·dedup·저장이 전부 스크립트(`manage_config.py`, `apply_collection_results.py`)로 위임되어 있어 Read/Write/Edit/Grep/WebFetch/WebSearch가 필요 없다. 헤드리스 커맨드의 `--allowedTools`는 `setup/SKILL.md`에서 `'Bash,Task'`로 좁혀 생성한다.
 
 # 수집 파이프라인 (오케스트레이터)
 
@@ -28,14 +28,13 @@ metadata:
 
 **각 단계에서 "현재 시각"을 새로 구하지 않는다.**
 
-## 0. 데이터 폴더 결정
+## 0. 데이터 폴더 확인
 
-- 인자로 절대경로가 왔으면(스케줄러 호출) 그것을 쓴다.
-- 없으면 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/resolve_install.py"` 규칙을 따른다. `none`이면 `/articles-os:setup` 안내 후 종료.
+`<DATA>` = `${user_config.data_path}`(헤드리스 `-p` 호출에서도 그대로 해석된다). `<DATA>/config.yaml`이 없으면 `/articles-os:setup` 안내 후 종료.
 
 ## 1. 소스 읽기
 
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_sources.py" list <DATA>` 실행. `sources`가 빈 배열이면 **조기 종료** — "등록된 소스가 없습니다. `/articles-os:add-source`로 추가하세요." 출력하고 끝.
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" sources list <DATA>` 실행. `sources`가 빈 배열이면 **조기 종료** — "등록된 소스가 없습니다. `/articles-os:add-source`로 추가하세요." 출력하고 끝.
 
 ## 2. 소스별 병렬 fetch
 
@@ -63,8 +62,10 @@ state.json 소스별 상태 갱신(성공/실패 카운터), last-run 필터, de
 **항상** 보낸다 — 신규가 0건이어도 "신규 없음"을 알린다 (조용히 스킵하지 않는다):
 
 ```bash
-echo "<메시지>" | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/notify.py" "<DATA>"
+echo "<메시지>" | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/notify.py" "<DATA>" "${CLAUDE_PLUGIN_DATA}"
 ```
+
+`${CLAUDE_PLUGIN_DATA}` 자리표시자를 그대로 적는다 — 스크립트 내부에서 환경변수로 다시 읽지 않는다(이유: `docs/rationale.md#secrets`).
 
 메시지 형식 (Slack 평문):
 

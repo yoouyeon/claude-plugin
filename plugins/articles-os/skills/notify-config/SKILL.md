@@ -14,38 +14,51 @@ metadata:
 
 # 알림 백엔드 설정
 
-`notify.yaml`(백엔드 선택) + `~/.articles-os/secrets.json`(웹훅 시크릿) 관리.
+`config.yaml`의 `notify` 섹션(백엔드 선택) + `${CLAUDE_PLUGIN_DATA}/secrets.json`(웹훅 시크릿) 관리.
 공통 규칙은 `${CLAUDE_PLUGIN_ROOT}/docs/conventions.md` 참조.
+
+`<DATA>` = `${user_config.data_path}`, `<PDATA>` = `${CLAUDE_PLUGIN_DATA}`. **반드시 이 두 자리표시자를 그대로 커맨드에 적는다** — 스크립트에 값을 미리 읽어서 넘기지 않는다(`os.environ`으로 다시 읽으면 세션에 같이 떠 있는 다른 플러그인의 hook이 남긴 값과 섞일 수 있음이 실측으로 확인됨. 상세: `${CLAUDE_PLUGIN_ROOT}/docs/rationale.md#secrets`).
 
 ## 절차
 
-1. **활성 설치 결정**: `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/resolve_install.py"` — `none`이면 `/articles-os:setup` 유도.
-2. **현재 상태 표시**: `notify.yaml`의 `backend`와, Slack이면 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/save_secret.py" has "<install_id>"`로 시크릿 존재 여부만 확인(URL 값 자체는 출력하지 않는다).
+1. **데이터 폴더 확인**: `<DATA>/config.yaml`이 없으면 "먼저 `/articles-os:setup`을 실행하세요" 안내 후 종료.
+2. **현재 상태 표시**: `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" notify get <DATA>`로 현재 `backend`를 보여주고, Slack이면 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/save_secret.py" has <PDATA>`로 시크릿 존재 여부만 확인(URL 값 자체는 출력하지 않는다).
 3. **백엔드 선택**: `slack` 또는 `none`. 순수 터미널 전제라 데스크톱 알림 옵션은 없다.
 
 ### Slack 선택 시
 
 1. 안내: "Slack Incoming Webhook URL을 붙여넣어 주세요. Slack → 앱 관리 → Incoming Webhooks에서 발급할 수 있습니다."
-2. 저장 — 활성 설치의 `install_id`로 실행 (검증·병합·`chmod 600`을 스크립트가 전담):
+2. 저장 (검증·저장·`chmod 600`을 스크립트가 전담):
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/save_secret.py" save "<install_id>" --url "<입력값>"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/save_secret.py" save <PDATA> --url "<입력값>"
 ```
 
 `ok: false`(`error: "invalid webhook url ..."`)면 형식이 잘못됐다고 알리고 재입력을 받는다.
 
-3. `notify.yaml`을 `backend: slack`으로 갱신. **웹훅 URL은 notify.yaml·데이터 폴더에 절대 넣지 않는다.**
+3. `config.yaml`의 `notify.backend`를 `slack`으로 갱신:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" notify set <DATA> --backend slack
+```
+
+**웹훅 URL은 `config.yaml`·데이터 폴더에 절대 넣지 않는다.**
+
 4. 테스트 알림으로 검증:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/notify.py" "<DATA>" --test
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/notify.py" "<DATA>" <PDATA> --test
 ```
 
 실패하면 에러를 보여주고 URL 재입력을 받는다. 성공하면 "웹훅은 언제든 Slack에서 폐기·재발급할 수 있고, 그 경우 이 스킬을 다시 실행하면 된다"고 안내한다.
 
 ### none 선택 시
 
-`notify.yaml`을 `backend: none`으로 갱신. 웹훅 입력 단계는 건너뛴다. 기존 시크릿은 지우지 않는다(다시 slack으로 돌아올 때 재사용 여부를 물어본다).
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" notify set <DATA> --backend none
+```
+
+웹훅 입력 단계는 건너뛴다. 기존 시크릿은 지우지 않는다(다시 slack으로 돌아올 때 재사용 여부를 물어본다).
 
 ## 주의
 

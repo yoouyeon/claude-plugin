@@ -12,9 +12,11 @@ metadata:
 
 새로 만드는 것 없이 `articles.json`을 읽어 렌더만 한다. 공통 규칙은 `${CLAUDE_PLUGIN_ROOT}/docs/conventions.md` 참조. 시간 필터·정렬·자동 확장 판정은 `scripts/filter_articles.py`가 전담한다 — 그 출력을 해석·렌더만 한다.
 
+`<DATA>` = `${user_config.data_path}`.
+
 ## 절차
 
-1. **활성 설치 결정**: `resolve_install.py` 규칙. `none`이면 setup 유도, `sources.yaml` 비었으면 add-source 유도.
+1. **데이터 폴더 확인**: `<DATA>/config.yaml`이 없으면 setup 유도, `sources`가 비었으면 add-source 유도.
 2. **필터 결정 → 스크립트 호출**: 사용자가 명시한 범위를 아래 매핑으로 옮겨 실행한다.
    - "이번 수집분" → `--mode latest_batch`
    - "최근 N일" → `--mode recent_days --days N`

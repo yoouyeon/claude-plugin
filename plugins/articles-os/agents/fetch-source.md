@@ -4,8 +4,8 @@ description: |
   Use this agent to fetch and parse a single RSS source. Spawned in parallel (one per source) by the collect skill's daily pipeline. Not user-facing.
 
   <example>
-  Context: collect 파이프라인이 sources.yaml의 소스 3개를 수집 중
-  user: "(스케줄러) /articles-os:collect /path/to/articles-os"
+  Context: collect 파이프라인이 config.yaml의 소스 3개를 수집 중
+  user: "(스케줄러) /articles-os:collect"
   assistant: "소스 3개를 fetch-source 에이전트로 병렬 수집합니다."
   <commentary>
   소스별 병렬 fan-out — 수집 시간이 소스 수에 비례하지 않게 한다.
