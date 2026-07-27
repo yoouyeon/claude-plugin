@@ -26,7 +26,7 @@ metadata:
 
 위 값을 **RUN_TS**라 부른다. 아래에서 시각이 필요한 모든 지점 — 3단계에서 `apply_collection_results.py`에 전달하는 `<RUN_TS>` 하나(내부적으로 `last_success_at`·신규 아티클의 `collected_at`·`state.json.last_run`에 모두 재사용됨) — 은 전부 이 값을 그대로 쓴다.
 
-**각 단계에서 "현재 시각"을 새로 구하지 않는다.** (배경: OS.md "주요 결정 사항" 참조)
+**각 단계에서 "현재 시각"을 새로 구하지 않는다.**
 
 ## 0. 데이터 폴더 결정
 
