@@ -1,105 +1,90 @@
 ---
 name: setup
 description: >
-  This skill should be used when the user asks to "set up articles-os", "articles-os 설정",
-  "온보딩", "초기 설정", or right after installing the plugin when `config.yaml` doesn't
-  exist yet at the data folder. Walks through the 3-step onboarding: RSS sources,
-  notification backend, and daily collection schedule (launchd/cron).
+  articles-os를 처음 설정할 때 쓰는 온보딩 스킬. "articles-os 설정해줘", "articles-os 설정",
+  "온보딩", "초기 설정" 같은 요청이 오거나, 플러그인 설치 직후 데이터 폴더에
+  config.yaml이 아직 없을 때 이 스킬을 실행한다. 데이터 폴더 초기화 → 알림 연결(Slack) →
+  매일 수집 스케줄 등록(launchd/cron)을 순서대로 진행한다.
 metadata:
   version: "0.1.0"
 ---
 
-# articles-os 온보딩
+## 0. 스킬 실행 조건 확인
 
-데이터 폴더 경로는 플러그인 활성화 시 Claude Code가 이미 물어본 값 `${user_config.data_path}`를
-그대로 쓴다 — 이 스킬에서 다시 묻지 않는다. 이하 `<DATA>`는 이 값을 가리킨다.
+아래 스크립트로 데이터 폴더 설정 여부를 확인한다:
 
-3단계를 순차 진행한다: **① 소스 추가 → ② 알림 연결 → ③ 스케줄 등록**.
-공통 경로·스키마는 `${CLAUDE_PLUGIN_ROOT}/docs/conventions.md` 참조.
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check_data_path.py" '${user_config.data_path}'
+```
 
-## 0. 데이터 폴더 초기화
+데이터 폴더 설정 여부가
+
+- `{"configured": false}` 인 경우 : "`/plugin configure articles-os@yoouyeon-plugins`를 먼저 실행해주세요"라고 안내한 뒤 종료한다.
+- `{"configured": true, "path": "..."}` 인 경우 : 그 `path`를 `<DATA>`로 쓰고 이후 단계를 순차 진행한다.
+
+## 1. 데이터 폴더 초기화
+
+아래 두 script를 실행하여 데이터 폴더를 초기화한다.
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init_data_folder.py" "<DATA>"
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/update_index.py" "<DATA>"
 ```
 
-이미 초기화돼 있으면(재설정 목적으로 setup을 다시 부른 경우) 기존 파일은 건드리지 않는다 — 사용자에게 재설정인지 확인하고 이어서 진행한다.
+데이터 폴더 초기화 이후의 디렉토리 구조는 아래와 같다. :
 
-## ① 소스 추가 (필수 — 없으면 플러그인이 동작하지 않음)
+```
+<data_path>/
+├── config.yaml        # sources(RSS 목록, 초기: 비어 있음) + notify(백엔드, 시크릿 없음 — 커밋 안전)
+├── articles.json       # 기계 상태: 수집 이력·중복 제거
+├── state.json          # last_run + 소스별 실패 상태
+└── notes/
+    ├── index.md        # 메모 목차 (scripts/update_index.py 가 갱신)
+    └── YYYY-MM-DD-제목슬러그.md
+```
 
-`add-source` 스킬과 같은 로직을 인라인으로 수행한다: RSS URL을 받아 `${CLAUDE_PLUGIN_ROOT}/scripts/fetch_feed.py`로 검증 후 `config.yaml`에 추가. 상세 절차는 `${CLAUDE_PLUGIN_ROOT}/skills/add-source/SKILL.md`를 따른다. 최소 1개 이상 등록을 권하되, 사용자가 나중으로 미루면 "소스가 없으면 수집이 조기 종료된다"고 알리고 진행한다.
+## 2. 알림 연결
 
-## ② 알림 연결
+**REQUIRED SUB-SKILL:** Use articles-os:notify-config
 
-`${CLAUDE_PLUGIN_ROOT}/skills/notify-config/SKILL.md`의 절차를 그대로 따른다 — 백엔드 선택부터 `save_secret.py` 호출·`config.yaml` 갱신·테스트 알림까지 그 스킬의 절차(스크립트 호출 포함)를 재사용한다. 여기서 새로 규정하지 않는다.
+articles-os:notify-config 스킬을 이용해서 알림 설정을 완료한다.
 
-## ③ 스케줄 등록 (자동 등록 + 사용자 확인)
-
-수집 시각을 물어본다 (기본 제안: 매일 09:00). OS는 `uname`으로 판별. **등록 커맨드를 사용자에게 먼저 보여주고 확인받은 뒤** 실행한다.
-
-실행 파일 경로를 먼저 확정해 커맨드에 절대경로로 지정한다:
+아래 스크립트로 완료 여부를 확인한다. :
 
 ```bash
-command -v claude              # <CLAUDE_BIN>
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check_notify_complete.py" <DATA> ${CLAUDE_PLUGIN_DATA}
 ```
 
-공통 실행 커맨드 — 데이터 경로는 인자로 넘기지 않는다:
+- `{"complete": true, ...}` 면 다음 단계로 진행한다.
+- `{"complete": false, ...}` 면 미완료 상태(notify-config 절차 중간 이탈)이므로, 사용자에게 알리고 articles-os:notify-config를 다시 안내한 뒤 재확인한다.
 
-```
-<CLAUDE_BIN> -p '/articles-os:collect' --allowedTools 'Bash,Task'
-```
+## 3. 스케줄 등록
 
-`--allowedTools`는 `Bash,Task`로 좁힌다 — `collect` 스킬은 소스 읽기·상태 갱신·dedup·저장을 전부 스크립트(`manage_config.py`, `apply_collection_results.py`)에 위임하고 `fetch-source` 서브에이전트 소환에 `Task`를 쓸 뿐, Read/Write/Edit/Glob/Grep/WebFetch/WebSearch를 직접 호출하지 않는다.
+**REQUIRED SUB-SKILL:** Use articles-os:schedule
 
-### macOS (launchd 우선)
+articles-os:schedule 스킬을 이용해서 수집 스케줄 등록을 완료한다.
 
-`~/Library/LaunchAgents/com.articles-os.plist` 작성:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>com.articles-os</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string><CLAUDE_BIN></string>
-    <string>-p</string>
-    <string>/articles-os:collect</string>
-    <string>--allowedTools</string>
-    <string>Bash,Task</string>
-  </array>
-  <key>StartCalendarInterval</key>
-  <dict><key>Hour</key><integer><HH></integer><key>Minute</key><integer><MM></integer></dict>
-  <key>StandardOutPath</key><string><HOME>/Library/Logs/articles-os.log</string>
-  <key>StandardErrorPath</key><string><HOME>/Library/Logs/articles-os.log</string>
-</dict>
-</plist>
-```
-
-등록·확인:
+아래 스크립트로 완료 여부를 확인한다. :
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.articles-os.plist
-launchctl list | grep com.articles-os
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_schedule.py" status
 ```
 
-### Linux (cron)
+- `{"registered": true, ...}` 면 다음 단계로 진행한다.
+- `{"registered": false, ...}` 면 미완료 상태이므로, 사용자에게 알리고 articles-os:schedule을 다시 안내한 뒤 재확인한다.
 
-crontab에 한 줄 추가 (식별 주석 필수 — 나중에 이 주석으로 찾아 제거·갱신):
+## 4. 마무리
 
-```bash
-(crontab -l 2>/dev/null; echo "<MM> <HH> * * * <CLAUDE_BIN> -p '/articles-os:collect' --allowedTools 'Bash,Task' >> \$HOME/.articles-os.log 2>&1 # articles-os") | crontab -
-crontab -l | grep articles-os
+아래 형식 그대로 요약을 보여준다 — 값은 2·3단계에서 확인한 결과로 채운다:
+
 ```
+articles-os 설정 완료
 
-## 마무리
+- 알림: <Slack | 알림 없음>
+- 수집 스케줄: 매일 <HH>:<MM>
 
-3단계 요약을 보여준다: 등록된 소스 수, 알림 백엔드, 스케줄 시각·확인 결과. 다음 행동 안내: 즉시 첫 수집을 돌려보려면 `/articles-os:collect`, 소스 추가는 `/articles-os:add-source`, 목록 보기는 `/articles-os:browse`.
-
-## 주의
-
-- 플러그인 디렉토리에 아무것도 쓰지 않는다. 쓰기 대상은 `<DATA>`와 `${CLAUDE_PLUGIN_DATA}`(시크릿)뿐.
-- 시크릿(웹훅 URL)은 `config.yaml`·데이터 폴더에 절대 넣지 않는다 — 오직 `${CLAUDE_PLUGIN_DATA}/secrets.json`(600).
-- Windows는 1차 범위 밖 — 감지되면 macOS/Linux에서 사용하라고 안내한다.
+다음 단계:
+- RSS 소스를 추가하려면: /articles-os:add-source
+- 지금 바로 수집을 돌려보려면: /articles-os:collect
+- 수집된 글 목록을 확인하려면: /articles-os:browse
+```
