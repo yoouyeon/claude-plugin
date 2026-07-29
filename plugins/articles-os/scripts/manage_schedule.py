@@ -10,7 +10,7 @@ Usage:
     `~/Library/LaunchAgents/com.articles-os.plist`에 등록한다. 등록되는 커맨드는 항상 고정이다: `<claude-bin> -p '/articles-os:collect' --allowedTools 'Bash,Task'`.
 
     작업 디렉토리는 지정하지 않는다 — plist의 `WorkingDirectory` 키도 쓰지 않는다.
-    PATH는 `EnvironmentVariables/PATH`로 명시해 흔한 설치 경로(`/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`)를 항상 포함시킨다.
+    PATH는 `EnvironmentVariables/PATH`로 명시한다 — 등록 시점의 PATH가 앞에 오고, 흔한 설치 경로(`/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`)로 뒤를 보강한다.
 
     register는 멱등적이다 — 다시 실행해도 중복 등록이 생기지 않는다.
     `--claude-bin`은 실행 가능한 파일이어야 하며, 절대경로로 확정해 기록한다.
@@ -60,9 +60,19 @@ def detect_os():
     return "macos" if system == "Darwin" else system.lower()
 
 
-def fallback_path():
+def schedule_path():
+    """plist에 넣을 PATH — 등록 시점의 PATH를 앞에 두고 흔한 설치 경로로 뒤를 보강한다.
+
+    등록은 사용자의 대화형 세션에서 일어나므로 그 PATH가 대화형에서 실제로 동작하는 도구를 가리킨다.
+    고정 목록을 앞에 두면 예약 실행만 다른 `python3`를 집어 대화형과 결과가 갈린다.
+    """
     home_bin = os.path.join(os.path.expanduser("~"), ".local", "bin")
-    return ":".join(FALLBACK_PATH_DIRS + [home_bin])
+    current = os.environ.get("PATH", "").split(":")
+    dirs = []
+    for d in current + FALLBACK_PATH_DIRS + [home_bin]:
+        if d and d not in dirs:
+            dirs.append(d)
+    return ":".join(dirs)
 
 
 def build_collect_command(claude_bin):
@@ -103,7 +113,7 @@ def macos_register(claude_bin, hour, minute):
         "StartCalendarInterval": {"Hour": hour, "Minute": minute},
         "StandardOutPath": log_path(),
         "StandardErrorPath": log_path(),
-        "EnvironmentVariables": {"PATH": fallback_path()},
+        "EnvironmentVariables": {"PATH": schedule_path()},
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
