@@ -18,7 +18,7 @@
 ## 시작하기
 
 ```
-/plugin marketplace add yoouyeon/plugin
+/plugin marketplace add yoouyeon/claude-plugin
 /plugin install articles-os@yoouyeon-plugins
 ```
 

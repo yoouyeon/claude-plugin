@@ -1,6 +1,6 @@
 # yoouyeon-plugins
 
-Claude Code 플러그인 마켓플레이스.
+Claude Code 플러그인 모음.
 
 ## 플러그인
 
@@ -11,6 +11,6 @@ Claude Code 플러그인 마켓플레이스.
 ## 설치
 
 ```
-/plugin marketplace add yoouyeon/plugin
+/plugin marketplace add yoouyeon/claude-plugin
 /plugin install articles-os@yoouyeon-plugins
 ```
