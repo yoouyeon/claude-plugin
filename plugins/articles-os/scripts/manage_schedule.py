@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""OS 네이티브 스케줄러(macOS: launchd, Linux: cron)에 헤드리스 수집 명령 등록/조회/제거
-(stdlib only).
+"""macOS launchd에 헤드리스 수집 명령 등록/조회/제거 (stdlib only, macOS 전용).
 
 Usage:
     python3 manage_schedule.py status
@@ -8,20 +7,22 @@ Usage:
     python3 manage_schedule.py remove
 
 동작:
-    OS는 platform.system()으로 판별한다(Darwin → launchd, Linux → cron). 등록될 커맨드는
-    항상 고정: `<claude-bin> -p '/articles-os:collect' --allowedTools 'Bash,Task'`.
+    `~/Library/LaunchAgents/com.articles-os.plist`에 등록한다. 등록되는 커맨드는 항상 고정이다: `<claude-bin> -p '/articles-os:collect' --allowedTools 'Bash,Task'`.
 
-    register는 멱등적이다 — 기존 등록이 있으면 (macOS는 launchctl unload 후 plist 덮어쓰기
-    후 load, Linux는 `# articles-os` 식별 주석이 붙은 기존 crontab 줄을 제거한 뒤 새 줄을
-    추가) 중복 등록을 만들지 않는다.
+    작업 디렉토리는 지정하지 않는다 — plist의 `WorkingDirectory` 키도 쓰지 않는다.
+    PATH는 `EnvironmentVariables/PATH`로 명시해 흔한 설치 경로(`/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`)를 항상 포함시킨다.
 
-    macOS plist는 plistlib로 읽고 쓴다 — 경로에 특수문자가 섞여도 XML 이스케이프 문제가
-    생기지 않는다.
+    register는 멱등적이다 — 다시 실행해도 중복 등록이 생기지 않는다.
+    `--claude-bin`은 실행 가능한 파일이어야 하며, 절대경로로 확정해 기록한다.
+
+    예약 실행은 user scope 설치를 전제로 한다: project/local scope로 설치하면 스케줄러가 `/articles-os:collect` 커맨드를 찾지 못한다.
 
 stdout (JSON):
-    status:   {"os": "macos"|"linux", "registered": true|false, "hour": .., "minute": ..}
-              {"os": "windows"|.., "registered": false, "error": "unsupported os"}
-    register: 성공 {"ok": true, "os": "...", "hour": .., "minute": ..}
+    status:   {"os": "macos", "registered": true|false, "hour": .., "minute": ..,
+               "claude_cli": {"available": true|false, "path": ".."|null}}
+              plist를 읽을 수 없으면 registered=false에 "error"가 함께 붙는다.
+              {"os": "<기타>", "registered": false, "error": "unsupported os"}
+    register: 성공 {"ok": true, "os": "macos", "hour": .., "minute": ..}
               실패 {"ok": false, "error": "..."}                       (exit code 1)
     remove:   {"ok": true, "removed": true|false}
 """
@@ -30,12 +31,15 @@ import json
 import os
 import platform
 import plistlib
+import shlex
+import shutil
 import subprocess
 import sys
+from typing import NoReturn
 
 LABEL = "com.articles-os"
-CRON_MARK = "# articles-os"
 COLLECT_ARGS = ["-p", "/articles-os:collect", "--allowedTools", "Bash,Task"]
+FALLBACK_PATH_DIRS = ["/usr/local/bin", "/usr/bin", "/bin", "/opt/homebrew/bin"]
 
 
 def plist_path():
@@ -46,18 +50,29 @@ def log_path():
     return os.path.expanduser("~/Library/Logs/articles-os.log")
 
 
-def fail(msg):
+def fail(msg) -> NoReturn:
     print(json.dumps({"ok": False, "error": msg}, ensure_ascii=False))
     sys.exit(1)
 
 
 def detect_os():
     system = platform.system()
-    if system == "Darwin":
-        return "macos"
-    if system == "Linux":
-        return "linux"
-    return system.lower()
+    return "macos" if system == "Darwin" else system.lower()
+
+
+def fallback_path():
+    home_bin = os.path.join(os.path.expanduser("~"), ".local", "bin")
+    return ":".join(FALLBACK_PATH_DIRS + [home_bin])
+
+
+def build_collect_command(claude_bin):
+    args = [claude_bin] + COLLECT_ARGS
+    return " ".join(shlex.quote(a) for a in args)
+
+
+def check_claude_cli():
+    path = shutil.which("claude")
+    return {"available": path is not None, "path": path}
 
 
 # ---- macOS (launchd) ----
@@ -80,20 +95,21 @@ def macos_status():
 def macos_register(claude_bin, hour, minute):
     path = plist_path()
     if os.path.exists(path):
-        subprocess.run(["launchctl", "unload", path], capture_output=True, text=True)
+        subprocess.run(["launchctl", "unload", path], capture_output=True, text=True, check=False)
 
     plist = {
         "Label": LABEL,
-        "ProgramArguments": [claude_bin] + COLLECT_ARGS,
+        "ProgramArguments": ["/bin/bash", "-c", build_collect_command(claude_bin)],
         "StartCalendarInterval": {"Hour": hour, "Minute": minute},
         "StandardOutPath": log_path(),
         "StandardErrorPath": log_path(),
+        "EnvironmentVariables": {"PATH": fallback_path()},
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
         plistlib.dump(plist, f)
 
-    result = subprocess.run(["launchctl", "load", path], capture_output=True, text=True)
+    result = subprocess.run(["launchctl", "load", path], capture_output=True, text=True, check=False)
     if result.returncode != 0:
         fail(f"launchctl load failed: {result.stderr.strip()}")
 
@@ -104,54 +120,9 @@ def macos_remove():
     path = plist_path()
     if not os.path.exists(path):
         return {"ok": True, "removed": False}
-    subprocess.run(["launchctl", "unload", path], capture_output=True, text=True)
+    subprocess.run(["launchctl", "unload", path], capture_output=True, text=True, check=False)
     os.remove(path)
     return {"ok": True, "removed": True}
-
-
-# ---- Linux (cron) ----
-
-def current_crontab_lines():
-    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
-    if result.returncode != 0:
-        return []
-    return [line for line in result.stdout.splitlines() if line.strip()]
-
-
-def linux_status():
-    for line in current_crontab_lines():
-        if CRON_MARK in line:
-            parts = line.split()
-            # "<MM> <HH> * * * ..." 순서 고정(register가 생성하는 형식과 동일)
-            minute, hour = parts[0], parts[1]
-            return {"os": "linux", "registered": True, "hour": int(hour), "minute": int(minute)}
-    return {"os": "linux", "registered": False}
-
-
-def linux_register(claude_bin, hour, minute):
-    kept = [line for line in current_crontab_lines() if CRON_MARK not in line]
-    new_line = (
-        f"{minute} {hour} * * * {claude_bin} -p '/articles-os:collect' "
-        f"--allowedTools 'Bash,Task' >> {os.path.expanduser('~')}/.articles-os.log 2>&1 {CRON_MARK}"
-    )
-    kept.append(new_line)
-    result = subprocess.run(
-        ["crontab", "-"], input="\n".join(kept) + "\n", capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        fail(f"crontab install failed: {result.stderr.strip()}")
-    return {"ok": True, "os": "linux", "hour": hour, "minute": minute}
-
-
-def linux_remove():
-    kept = [line for line in current_crontab_lines() if CRON_MARK not in line]
-    before = len(current_crontab_lines())
-    result = subprocess.run(
-        ["crontab", "-"], input="\n".join(kept) + ("\n" if kept else ""), capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        fail(f"crontab install failed: {result.stderr.strip()}")
-    return {"ok": True, "removed": before != len(kept)}
 
 
 # ---- dispatch ----
@@ -172,14 +143,20 @@ def main():
     args = parser.parse_args()
     os_name = detect_os()
 
-    if os_name not in ("macos", "linux"):
+    if os_name != "macos":
         if args.action == "status":
             print(json.dumps({"os": os_name, "registered": False, "error": "unsupported os"}, ensure_ascii=False))
             return
         fail(f"unsupported os: {os_name}")
 
     if args.action == "status":
-        result = macos_status() if os_name == "macos" else linux_status()
+        try:
+            result = macos_status()
+        except (OSError, ValueError) as e:
+            # plist가 깨졌거나 읽을 수 없는 경우. registered를 false로 두어 스킬이 재등록을
+            # 유도하게 한다 — register는 기존 plist를 읽지 않고 덮어쓰므로 그대로 복구된다.
+            result = {"os": "macos", "registered": False, "error": f"{type(e).__name__}: {e}"}
+        result["claude_cli"] = check_claude_cli()
         print(json.dumps(result, ensure_ascii=False))
         return
 
@@ -188,16 +165,24 @@ def main():
             fail("hour must be 0-23")
         if not (0 <= args.minute <= 59):
             fail("minute must be 0-59")
-        result = (
-            macos_register(args.claude_bin, args.hour, args.minute)
-            if os_name == "macos"
-            else linux_register(args.claude_bin, args.hour, args.minute)
-        )
+        claude_bin = args.claude_bin.strip()
+        if not claude_bin:
+            fail("register requires --claude-bin")
+        claude_bin = os.path.abspath(os.path.expanduser(claude_bin))
+        if not (os.path.isfile(claude_bin) and os.access(claude_bin, os.X_OK)):
+            fail(f"not an executable file: {claude_bin}")
+        try:
+            result = macos_register(claude_bin, args.hour, args.minute)
+        except OSError as e:
+            fail(f"{type(e).__name__}: {e}")
         print(json.dumps(result, ensure_ascii=False))
         return
 
     if args.action == "remove":
-        result = macos_remove() if os_name == "macos" else linux_remove()
+        try:
+            result = macos_remove()
+        except OSError as e:
+            fail(f"{type(e).__name__}: {e}")
         print(json.dumps(result, ensure_ascii=False))
         return
 

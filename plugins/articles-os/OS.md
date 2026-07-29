@@ -2,15 +2,15 @@
 
 > 마켓플레이스 배포용 플러그인. 소스는 비워둔 채 배포하고, 사용자가 자기 RSS를 추가해서 쓰는 범용 학습 파이프라인.
 
-## 실행 환경 (Claude Code 전용, 순수 터미널)
+## 실행 환경 (Claude Code 전용, macOS, 순수 터미널)
 
-**Claude Code 전용 (Cowork 미지원):** egress allowlist 고정 + 번들 hooks 미발화 보고 때문에 핵심 파이프라인(수집·알림·index.md 갱신) 보장 불가. 자세한 근거: [docs/rationale.md#cowork](docs/rationale.md#cowork)
+**Claude Code 전용 (Cowork 미지원).**
 
-**Desktop 앱도 요구하지 않는다 — 순수 터미널(헤드리스 서버 포함)에서 동작.** 아래 artifact·알림·스케줄링 설계는 전부 이 전제를 따른다.
+**Desktop 앱을 요구하지 않는다 — 터미널만으로 동작한다.** 아래 artifact·알림·스케줄링 설계는 전부 이 전제를 따른다.
 
 - **artifact 사용 안 함.** 모든 스킬 출력은 터미널 마크다운.
 - **데스크톱 알림 미지원.** Slack 웹훅 등 범용 백엔드가 `notify()` 추상화의 기본이자 사실상 유일한 실용 옵션.
-- **스케줄링은 OS 네이티브 스케줄러(macOS: launchd 우선/cron, Linux: cron), Claude 자체 스케줄링 기능은 배제.** 설정 스킬이 OS 스케줄러에 `claude -p "<수집 스킬 실행 프롬프트 + 데이터 경로>"`를 헤드리스로 등록한다(비대화형 print 모드). Windows는 1차 범위 제외. 근거(Windows 제외 사유 + Claude 자체 옵션 3종을 배제한 이유): [docs/rationale.md#scheduling](docs/rationale.md#scheduling)
+- **스케줄링은 macOS launchd.** Claude 자체 스케줄링 기능은 배제. 설정 스킬이 `claude -p '/articles-os:collect'`를 헤드리스로 등록한다. **macOS 전용** — Linux·Windows는 지원 범위 밖이다.
 
 ## 흐름
 
@@ -28,101 +28,74 @@
 
 ## 설계
 
-### 저장 위치 원칙 (배포 핵심)
+### 저장 위치
 
-플러그인 설치 디렉토리는 **읽기 전용**으로 취급하고, 업데이트 시 덮어써질 수 있다. 따라서 사용자가 만든 데이터·설정·런타임 상태는 **전부 플러그인 밖**에 저장한다.
-
-새 디렉토리를 우리가 만들지 않고, Claude Code가 이미 관리하는 인프라(`userConfig`, `${CLAUDE_PLUGIN_DATA}`)에 얹는다. 근거: [docs/rationale.md#storage-location](docs/rationale.md#storage-location)
+플러그인 설치 디렉토리는 **읽기 전용**으로 취급한다. 사용자가 만든 데이터·설정·런타임 상태는 **전부 플러그인 밖**에 저장한다.
 
 ```
-<plugin>/                         # 배포물 (읽기 전용): 로직·스킬만
-└── skills, commands, manifest ...
+${CLAUDE_PLUGIN_ROOT}/            # 읽기 전용: 로직·스킬만
+└── skills, agents, scripts, manifest
 
-~/.claude/settings.json           # Claude Code 기존 인프라 (플러그인 userConfig 저장소)
-└── pluginConfigs["articles-os@..."].options.data_path   # 데이터 폴더 절대경로
-
-${CLAUDE_PLUGIN_DATA}/             # Claude Code 기존 인프라 (~/.claude/plugins/data/articles-os-.../)
+${CLAUDE_PLUGIN_DATA}/            # ~/.claude/plugins/data/articles-os-.../
 └── secrets.json                  # 웹훅 시크릿만, chmod 600
 
-<data_path>/                      # 사용자 데이터 (영구): userConfig로 지정된 경로
-    ├── config.yaml                # 사용자가 추가한 RSS 소스 + 알림 백엔드 선택 (초기값: sources 비어 있음)
-    ├── articles.json              # 기계 상태: 수집 이력·중복 제거·요약(RSS description 재사용)
-    ├── state.json                 # last-run 타임스탬프 등 실행 상태
-    └── notes/                     # 사람 산출물: 아티클당 메모 .md
-        ├── index.md              # 메모 목차 (필수, 메모 저장 시마다 자동 갱신)
-        └── YYYY-MM-DD-제목슬러그.md
+~/.articles-os/                   # 기계 상태 (고정 경로, 설정 불가)
+    ├── config.yaml               # notes_path + RSS 소스 + 알림 백엔드 (초기값: sources 비어 있음)
+    ├── articles.json             # 수집 이력·중복 제거
+    └── state.json                # last-run 타임스탬프 + 소스별 실패 상태
+
+<사용자가 고른 폴더>/notes/       # 메모 폴더 (= config.yaml의 notes_path)
+    ├── index.md                  # 메모 목차 (메모 저장 시마다 자동 갱신)
+    └── YYYY-MM-DD-제목슬러그.md
 ```
 
-**역할 분리 원칙:** 기계가 읽는 상태(json)와 사람이 두고 보는 산출물(md)을 섞지 않는다. 메모는 이식성 좋은 .md로, articles.json은 그 메모의 존재/경로만 가리킨다.
-
-`config.yaml`(사람이 편집하는 설정: sources/notify)과 `articles.json`/`state.json`(기계가 매일 갱신하는 상태)을 굳이 서브폴더로 나누지 않는다. `articles.json`과 `state.json`은 반대로 **분리를 유지**한다 — 전자는 계속 쌓이는 이력(커질 수 있음), 후자는 매 실행마다 갱신되는 작은 실행 상태다.
+- **기계 상태 저장 경로는 `~/.articles-os/`로 고정.** 설정 대상이 아니며 cwd·설치 scope와 무관하게 동작한다.
+- **메모 폴더만 사용자가 지정.** setup이 대화로 상위 폴더를 받아 그 밑의 `notes/`를 절대경로로 확정하고 `config.yaml`의 `notes_path`에 기록한다. 대화형 스킬에서만 쓴다.
+- **경로는 인자로 넘기지 않는다.** 각 스크립트가 `scripts/paths.py`로 스스로 찾는다.
+- **예약 실행은 user scope 설치를 전제로 한다.** project/local scope는 그 디렉토리에서만 커맨드가 인식된다.
+- **역할 분리:** 기계가 읽는 상태(json)와 사람이 두고 보는 산출물(md)을 섞지 않는다. 메모는 이식성 좋은 .md로 두고, `articles.json`은 그 메모의 파일명만 가리킨다.
 
 ### 온보딩 (필수)
 
-기본 소스가 없으므로 설치 직후엔 수집할 것이 없다. 아래 순서를 밟지 않으면 플러그인이 "동작 안 함"으로 보인다.
-
 ```
-0. 데이터 폴더 지정 → 플러그인 활성화 시 Claude Code가 자동으로 물어봄 (userConfig, 기본 제안: `./articles-os`)
-1. 소스 추가       → config.yaml 에 RSS 등록 (필수 스킬, 선택 기능 아님)
-2. 알림 연결       → config.yaml 에 백엔드 선택 (Slack 웹훅이 사실상 유일한 실용 옵션,
-                     데스크톱 알림은 지원 안 함 — 순수 터미널 전제)
-3. 스케줄 등록     → OS 스케줄러(macOS: launchd 우선/cron, Linux: cron)에 헤드리스 수집 명령 등록
+1. 메모 폴더 지정   → `setup` 스킬이 대화로 물어봄 (기본 제안: 현재 폴더)
+2. 알림 연결       → config.yaml 에 백엔드 선택
+3. 스케줄 등록     → OS 스케줄러에 헤드리스 수집 명령 등록
 ```
 
-0단계는 `setup` 스킬이 다루지 않는다 — 플러그인 매니페스트의 `userConfig` 선언으로 Claude Code가 활성화 시점에 자동으로 프롬프트한다. 근거: [docs/rationale.md#user-config](docs/rationale.md#user-config)
+소스 추가는 온보딩에 넣지 않는다 — `add-source`로 언제든 추가·삭제하는 후속 단계다.
 
 ### 설정 스킬 (온보딩 + 재설정)
 
-설정은 "온보딩 1개 스킬 + 개별 재실행 진입점"으로 구성한다. 소스는 자주 추가되고, 알림은 가끔 바뀌며, 스케줄은 최초 1회뿐이라 **수명이 달라서** 재실행 단위를 쪼갠다.
+"온보딩 1개 스킬 + 개별 재실행 진입점"으로 구성한다.
 
-- **`setup` (온보딩):** 데이터 폴더 초기화(`config.yaml`/`articles.json`/`state.json`/`notes/` 생성) 후 3단계를 순차 안내 — 소스 추가 → 알림 연결 → 스케줄 등록.
-- **`add-source` (재실행 진입점):** `config.yaml`의 `sources`에 RSS 추가/삭제. 온보딩과 로직 공유, 단독 호출 가능.
-- **`notify-config` (재실행 진입점):** `config.yaml`의 `notify.backend` 변경. 단독 호출 가능.
-
-#### 데이터 폴더 경로 (userConfig)
-
-수집은 매일 1회 **사용자 없이 백그라운드로** 돈다. 데이터 폴더 위치는 플러그인 매니페스트의 `userConfig(type: directory)` 필드로 해결한다 — Claude Code가 값을 `~/.claude/settings.json`에 저장하고, 스킬 콘텐츠의 `${user_config.data_path}` 자리를 실제 경로로 치환해준다. 이 치환은 대화형 세션과 **OS 스케줄러의 헤드리스 `-p` 호출 양쪽에서 동일하게 동작**한다.
-
-- `userConfig` 값은 cwd와 무관하게 고정 저장되므로 cwd 기반 추정이 불필요하다.
-- 플러그인당 스코프당 `userConfig` 값은 하나뿐이라 여러 설치 중 활성 설치를 고르는 판별 로직이 불필요하다.
-- `claude -p '/articles-os:collect'`처럼 고정 커맨드만 등록하면 된다 — `${user_config.data_path}`가 헤드리스 실행에서도 해석되기 때문.
+- **`setup` (온보딩):** 메모 폴더를 묻고 초기화(`~/.articles-os/`에 `config.yaml`/`articles.json`/`state.json`, 지정 폴더에 `notes/` 생성) 후 알림 연결·스케줄 등록을 순차 안내.
+- **`add-source`:** `config.yaml`의 `sources`에 RSS 추가/삭제. 단독 호출 가능.
+- **`notify-config`:** `config.yaml`의 `notify.backend` 변경. 단독 호출 가능.
+- **`schedule`:** 수집 스케줄 등록·변경·제거. 단독 호출 가능.
 
 #### 스케줄 등록 (자동 + 확인)
 
-설정 스킬이 OS 스케줄러에 **직접 등록**(매일 1회)하되 등록 전 사용자 확인을 받는다 — macOS는 `~/Library/LaunchAgents/com.articles-os.plist` 작성 후 `launchctl load`, Linux는 `crontab`에 한 줄 추가. 수집 실행 로그는 launchd의 `StandardOutPath`/`StandardErrorPath` 또는 cron의 `>> ... 2>&1` 리다이렉션에 맡긴다 — 별도 로그 관리 코드를 만들지 않는다.
+설정 스킬이 OS 스케줄러에 **직접 등록**(매일 1회)하되 등록 전 사용자 확인을 받는다. 수집 실행 로그는 OS 스케줄러의 리다이렉션 기능에 맡긴다 — 별도 로그 관리 코드를 만들지 않는다.
 
 #### 진입 (자동 감지 + 유도)
 
-수집·브라우징 등 다른 스킬이 **`<data_path>/config.yaml`이 없거나 `sources`가 비었음을 감지**하면 "먼저 설정하세요"로 `setup`(또는 `add-source`)을 유도한다. 기본 소스가 없어 설치 직후 "동작 안 함"으로 보이는 문제를 막는다. (자동 유도이되 자동 실행은 아님 — 사용자가 의도치 않게 설정 플로우에 빠지지 않도록.)
-
-#### 설정·상태 파일 스키마
-
-**`~/.claude/settings.json` (Claude Code 기존 인프라)**
-
-`pluginConfigs["articles-os@<marketplace>"].options.data_path`에 데이터 폴더 절대경로가 저장된다. 우리가 직접 관리하는 파일이 아니라 Claude Code의 `userConfig` 메커니즘이 읽고 쓴다.
-
-**`${CLAUDE_PLUGIN_DATA}/secrets.json` (Claude Code 기존 인프라, 웹훅 시크릿)**
-
-`{ "slack_webhook_url": "..." }` 하나만 담는 flat 파일, `chmod 600`. `${CLAUDE_PLUGIN_DATA}`는 Claude Code가 관리하는 플러그인 영구 데이터 디렉토리 경로(`~/.claude/plugins/data/<plugin-id>/`)다. **스크립트가 이 경로를 `os.environ`으로 다시 읽지 않는다** — 대신 SKILL.md 콘텐츠 안에서 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 그대로 적어 스크립트에 인자로 넘긴다. 근거: [docs/rationale.md#secrets](docs/rationale.md#secrets).
-
-**`<data_path>/config.yaml` (사용자 RSS 소스 + 알림 백엔드)**
-
-수집이 매일 훑을 피드 목록(`sources`)과 알림 백엔드 선택(`notify.backend`)을 한 파일에 담는다. 배포물엔 `sources`가 비어 있고 온보딩/`add-source`가 채운다. 수집 파이프라인 첫 단계가 이 파일을 읽고, `sources`가 비었으면 조기 종료한다. `notify(신규목록)`은 백엔드를 모르고 이 파일의 `notify.backend`만 본다(알림 추상화). Slack 웹훅이 기본이자 사실상 유일한 실용 옵션이고, `none`도 가능(순수 터미널 전제라 데스크톱 알림 옵션은 없음). 시크릿이 없으므로 프로젝트째 커밋·동기화돼도 안전하다. 스키마는 [docs/conventions.md](docs/conventions.md) 참조.
+다른 스킬이 초기화 전이거나 `sources`가 비었음을 감지하면 `setup`(또는 `add-source`)을 **유도한다.**
 
 #### 알림 온보딩 흐름 (백엔드 + 시크릿 입력)
 
-웹훅 URL은 계정별로 다르고 노출되면 안 되는 값이라 **배포물엔 넣지 않고 온보딩 때 사용자가 입력**한다. Slack 선택 시:
+웹훅 URL은 온보딩 때 사용자가 입력한다. Slack 선택 시:
 
 ```
 1. 백엔드로 Slack 선택
-2. "Slack Incoming Webhook URL 붙여넣기" 안내 (사용자가 Slack 앱 설정에서 발급)
-3. 입력값을 `${CLAUDE_PLUGIN_DATA}/secrets.json` 에 저장 (config.yaml엔 안 넣음) — 스킬이 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 스크립트에 인자로 넘겨서 처리, 환경변수 재조회 아님
-4. 저장 후 테스트 알림 1회로 검증 + "웹훅은 언제든 Slack에서 폐기·재발급 가능" 안내
+2. "Slack Incoming Webhook URL 붙여넣기" 안내
+3. 입력값을 `${CLAUDE_PLUGIN_DATA}/secrets.json` 에 저장 (config.yaml엔 안 넣음)
+4. 저장 후 테스트 알림 1회로 검증
 ```
 
 `backend: none`을 고르면 웹훅 입력 단계는 건너뛴다.
 
-### 수집 파이프라인 (매일 1회, OS 스케줄러가 헤드리스로 기동)
+### 수집 파이프라인 (매일 1회 OS 스케줄러가 헤드리스로 기동, 수동 실행도 가능)
 
 ```
 config.yaml의 sources 읽기 (비어 있으면 조기 종료 + 안내)
@@ -130,84 +103,58 @@ config.yaml의 sources 읽기 (비어 있으면 조기 종료 + 안내)
         → RSS fetch + 파싱 (실패 시 에러로 반환 — 전체 실행을 막지 않음)
     → 성공한 소스만 결과 merge (실패 소스는 스킵, 부분 성공 허용)
     → 소스별 실패 상태 갱신 (state.json)
-      - 성공: consecutive_failures = 0, last_success_at 갱신, alerted = false
-      - 실패: consecutive_failures += 1
     → state.json 의 last-run 이후 발행분만 필터
       (최초 실행 = last-run 없음 → 오늘 발행분만 시드)
     → articles.json 대조 → 신규만 필터 (URL 기준 중복 제거)
-    → articles.json 업데이트
-    → 소스가 하나라도 성공했으면 state.json 의 last-run 갱신
-      (전부 실패면 last-run 유지 → 다음 실행 때 같은 시점부터 재시도, 그날 발행분 유실 방지)
-    → 신규 아티클마다 RSS 피드의 description 필드를 summary로 사용 (AI 생성 안 함, 본문은 저장 안 함)
-    → 신규 있거나 이번에 연속 실패 임계치(3회)를 새로 넘은 소스가 있으면 notify(신규목록, 실패경고) 호출
-      (실패 경고는 소스당 alerted=false일 때 1회만 — 매번 알리면 스팸이라 임계치 최초 도달 시에만)
-      → 실패경고를 보낸 소스는 alerted = true로 갱신 (다음 실행부터 같은 소스로 중복 경고 안 감, 위 실패 상태 갱신 단계에서 성공 시 다시 false로 리셋)
+    → articles.json 업데이트 (summary는 RSS description 그대로 — AI 생성 안 함, 본문은 저장 안 함)
+    → 소스가 하나라도 성공했으면 state.json 의 last-run 갱신 (전부 실패면 last-run 유지 → 그날 발행분 유실 방지)
+    → notify(신규목록, 실패경고) 호출 — 신규가 0건이어도 발송
 ```
 
-### articles.json / state.json 스키마 (기계 상태)
+### articles.json / state.json (기계 상태)
 
-`articles.json`은 수집 이력·중복 제거를 위한 저장소다. 메타데이터만 가볍게 유지하고, 메모 자체는 담지 않고 .md 파일 경로만 가리킨다. `summary`는 RSS 피드 자체의 `description` 필드를 그대로 쓰는 **알림 문구용 한 줄**이다(AI가 따로 생성하지 않음). Q&A·인터뷰에는 쓰지 않고 항상 **원문**을 쓰며, 본문은 Q&A/메모를 처음 열 때 지연 fetch하고 세션 컨텍스트에만 남는다(디스크에 캐시하지 않음).
-
-`state.json`은 수집 실행 자체의 상태(언제까지 수집했는지, 소스별 상태)만 최소로 유지한다. `consecutive_failures`가 3 이상이면 "죽은 소스"로 간주해 알림을 보낸다(`alerted`로 중복 방지, 딱 1회).
-
-두 파일 모두 정확한 스키마는 [docs/conventions.md](docs/conventions.md) 참조.
+- `articles.json` — 수집 이력·중복 제거 저장소. 메타데이터만 유지하고 메모 자체는 담지 않으며 .md 파일명만 가리킨다.
+- `state.json` — 수집 실행 상태(last-run + 소스별 실패)만 최소로 유지. 연속 실패가 임계치를 넘은 소스는 "죽은 소스"로 간주해 1회만 알린다.
 
 ### 메모 스킬 (회상 인터뷰 → .md)
 
-목적은 "읽은 것을 머리와 메모에 잘 남기는 것"이다. 남이 정리해주는 것보다 사용자가 직접 떠올려 말하는 순간에 기억에 박히므로(능동 회상·생성 효과), 템플릿 채우기나 플래시카드가 아니라 대화형으로 끌어낸다.
-
-흐름:
+템플릿 채우기나 플래시카드 형식이 아니라 대화형으로 끌어낸다.
 
 1. **자유 덤프.** 질문으로 시작하지 않는다. "이 아티클 읽고 든 생각·의문·좋았던 점·동의 안 되는 점, 뭐든 자유롭게" 열어두고 사용자가 먼저 쏟아낸다.
-2. **비결정 인터뷰.** 고정 질문 세트가 아니라, 아티클 내용 + 덤프를 읽고 그 자리에서 질문을 생성한다. 아티클을 지식형/인사이트형으로 미리 분류하지 않는다 — 한 아티클이 둘 다일 수 있다.
-   - **치우침 방지:** 덤프가 반응·의견에 쏠렸으면 개념을 짚는 질문으로, 사실·개념에 쏠렸으면 "그래서 어떻게 생각해?" 쪽으로, 사용자가 **덜 건드린 쪽을 메운다.** 고정 비율이 아니라 갭 채우기.
-   - **톤:** 정답 채점(퀴즈)이 아니라 "네 말로 다시 설명해봐" 식 대화. 아티클의 내용을 그대로 암기했는지 캐묻지 않는다 (예: reflow 아티클에 "reflow 유발 CSS 속성 다 말해봐" 같은 시험은 안 함).
-   - **교정:** 단, 사용자가 아티클 내용을 **잘못 기억·이해**하고 있으면 부드럽게 바로잡는다. 채점은 안 하되 틀린 기억을 그대로 굳히게 두지도 않는다.
-   - **Q&A 연계:** 인터뷰는 아티클 + 덤프뿐 아니라 그 아티클의 기존 `qa_log`도 함께 읽어, 이미 Q&A에서 다룬 걸 다시 묻지 않는다.
-3. **상한 + 계속 여부.** 대략 3~4턴을 상한으로 두되 자동 종료하지 않고, 도달하면 "더 파고들래?"를 묻는다. 상한은 번잡스러움 방지선, 계속 여부는 사용자가 쥔다.
-4. **.md 출력.** 덤프 원문을 그대로 남기고 + 요약을 붙인다. 이 요약은 AI 재서술이 아니라 **사용자가 덤프·인터뷰에서 한 말을 정리·구조화**한 것이다(능동 생성 유지 — 남이 대신 정리해주는 게 아님). 날것 생각을 함께 보존해야 나중 회고에 쓸모 있다. `notes/YYYY-MM-DD-제목슬러그.md`에 저장하고, articles.json의 `note_path`를 갱신한 뒤 `qa_log`를 비운다.
+2. **비결정 인터뷰.** 고정 질문 세트가 아니라, 아티클 내용 + 덤프를 읽고 그 자리에서 질문을 생성한다. 아티클을 지식형/인사이트형으로 미리 분류하지 않는다.
+   - **치우침 방지:** 사용자가 **덜 건드린 쪽을 메운다.** 고정 비율이 아니라 갭 채우기.
+   - **톤:** 정답 채점(퀴즈)이 아니라 "네 말로 다시 설명해봐" 식 대화. 암기 시험은 하지 않는다.
+   - **교정:** 사용자가 아티클 내용을 잘못 기억·이해하고 있으면 부드럽게 바로잡는다.
+   - **Q&A 연계:** 그 아티클의 기존 `qa_log`도 함께 읽어, 이미 Q&A에서 다룬 걸 다시 묻지 않는다.
+3. **상한 + 계속 여부.** 3~4턴을 상한으로 두되 자동 종료하지 않고, 도달하면 "더 파고들래?"를 묻는다. 계속 여부는 사용자가 쥔다.
+4. **.md 출력.** 덤프 원문을 그대로 남기고 정리를 붙인다. 정리는 AI 재서술이 아니라 **사용자가 덤프·인터뷰에서 한 말의 구조화**다. `<메모 폴더>/YYYY-MM-DD-제목슬러그.md`에 저장하고, articles.json의 `note_path`를 갱신한 뒤 `qa_log`를 비운다.
 
 ### 알림 추상화
 
-파이프라인은 `notify(신규목록)` 인터페이스만 호출하고, 실제 백엔드는 `config.yaml`의 `notify.backend`에서 고른다. 웹훅 URL 등 시크릿은 배포물에 넣지 않고 온보딩 때 사용자가 입력한다.
+파이프라인은 `notify(신규목록)` 인터페이스만 호출하고, 실제 백엔드는 `config.yaml`의 `notify.backend`에서 고른다.
 
-### 마켓플레이스 매니페스트
+메시지 문자열 조립도 모델이 하지 않고 스크립트가 전담한다.
 
-- Slack 알림은 Incoming Webhook URL에 직접 HTTP POST하는 방식이라 별도 MCP 커넥터 의존성이 없다 (OAuth 연결·앱 설치 불필요).
-- 시크릿(웹훅 URL 등)은 배포물에 포함하지 않는다.
+### 설치 의존성 (외부 연결·사전 입력 없음)
 
-### 구성 요소 (skill / agent) — 스킬 vs 서브에이전트 분리
+- Slack 알림은 Incoming Webhook URL에 직접 HTTP POST한다 — 별도 MCP 커넥터 의존성 없음.
+- `userConfig`를 선언하지 않는다 — 설정값은 `setup`이 대화로 받아 `config.yaml`에 기록한다.
 
-설정 스킬(소스 추가·알림 설정)을 제외한 8개 유닛으로 구성한다. "형태"는 아래 기준으로 정한다:
+### 구성 요소 (skill / agent)
 
-- **서브에이전트로 떼는 기준** (셋 중 하나면): 병렬 fan-out(소스·파일 여러 개 동시 처리) / 컨텍스트 격리(대량 읽기가 메인 대화 오염) / 자율 실행(왕복 없이 결과만 반환)
+설정 스킬을 제외한 9개 유닛으로 구성한다. "형태"는 아래 기준으로 정한다:
+
+- **서브에이전트로 떼는 기준** (셋 중 하나면): 병렬 fan-out / 컨텍스트 격리 / 자율 실행
 - **스킬로 남기는 기준:** 대화 왕복 자체가 본질일 때. 서브에이전트는 사용자와 직접 주고받지 못하므로 회상 인터뷰·Q&A는 메인 스레드 스킬이어야 한다.
 
-| # | 유닛 | 형태 | 역할 | 형태 선택 근거 |
-|---|---|---|---|---|
-| 1 | 수집 에이전트 | 오케스트레이터 | 소스 읽기 → 병렬 fetch 지휘 → 실패 소스 스킵(부분 성공) → 필터·중복제거·저장 → 알림/실패 경고 (daily orchestrator) | 스케줄러가 부르는 자율 지휘자, 아래 서브에이전트 소환 |
-| 2 | 소스별 fetch 서브에이전트 | 서브에이전트 | RSS fetch/파싱 (수집 에이전트가 소스별 병렬 소환) | 소스별 병렬 fan-out |
-| 3 | Q&A 스킬 | 스킬 (+조사 서브에이전트 조건부) | 아티클 링크 + 질문 → 원문 기반 답변, `qa_log` 적재. 외부 조사 필요 시 서브에이전트에 위임 | 질문·답변은 왕복(스킬); "필요 시 외부 자료"의 웹 fan-out만 조건부 위임 |
-| 4 | 메모 스킬 | 스킬 | 자유 덤프 → 회상 인터뷰(교정·Q&A연계) → `.md` 저장 → `qa_log` 정리 | turn-by-turn 대화가 본질 |
-| 5 | 아티클 브라우징 스킬 | 스킬 | 수집된 아티클을 텍스트 목록으로 다시 보기 — 휘발되는 알림의 영구 pull 표면 (아래 상세) | 가볍고 사용자가 바로 봄, 격리 이득 없음 |
-| 6 | index.md 갱신 | 스크립트/후크 | 메모 저장 후 `notes/index.md` 목차 자동 갱신 | 결정적 갱신 — 서브에이전트는 과함 |
-| 7 | 메모 검색·연결 | 서브에이전트 | `notes/` 전체 `.md` read-heavy 검색 + 관련 메모 링크 | 대량 읽기가 메인 대화 오염 → 격리 |
-| 8 | 소스 헬스체크 에이전트 | 서브에이전트 | 자동 실패 알림(연속 fetch 실패 3회)이 못 잡는 사각지대를 리포트 — articles.json에서 소스별 최신 `published_at`을 집계해 **fetch는 계속 성공하지만 오래 무발행인 소스**를 찾아냄. state.json의 `consecutive_failures` 현황도 함께 요약 (조용한 소스 고사 방지) | 네트워크 재확인 없는 로컬 집계, 자율 실행이라 왕복 불필요 |
-
-Q&A(3)처럼 "조사(서브에이전트) → 대화(스킬)"로 쪼개지는 게 대표 패턴이다.
-
-**5번 브라우징 스킬 상세:**
-
-알림은 하루 1회 push되고 지나가면 다시 볼 수 없다(휘발성). 브라우징은 같은 내용을 필요할 때 다시 꺼내 보는 **pull 표면**이다 — 새로 만드는 게 아니라 `articles.json`을 읽어 목록으로 렌더.
-
-- **출력:** 아티클마다 `제목 · 출처 · 발행일 · 한 줄 summary · 원문 링크`를 시간순 텍스트 목록으로. (artifact 아님, 순수 마크다운)
-- **필터:** 읽음 여부가 아니라 **시간 기반** — "이번 수집분 / 최근 N일 / 전체". `collected_at` 하나로 자동 계산, 사용자가 관리할 상태 없음.
-- **역할:** 각 항목이 후속 행동의 진입점. 목록에서 "N번에 질문"(→ Q&A), "N번 메모"(→ 메모)로 링크를 집어 다음 스킬로 넘어간다. 본문 자체를 보고 싶으면 목록의 원문 링크를 바로 연다.
-- **읽음/미읽 개념 미도입:** 실제 읽기는 브라우저(원문 링크)에서 일어나 관측 불가능하고, 수동 읽음 토글은 사용자에게 관리 부담을 준다. `read_at` 같은 상태 필드는 두지 않는다.
-
-## 소스 목록
-
-기본 탑재 없음. 사용자가 온보딩에서 추가한다. (예시로 참고용 소스만 문서화)
-
-- 예) https://toss.tech/rss.xml
-- 예) https://kofearticle.substack.com/feed
+| # | 유닛 | 형태 | 역할 |
+|---|---|---|---|
+| 1 | 수집 오케스트레이터 | 스킬(헤드리스) | 소스 읽기 → 병렬 fetch 지휘 → 실패 소스 스킵 → 필터·중복제거·저장 → 알림 |
+| 2 | 소스별 fetch | 서브에이전트 | RSS fetch/파싱 (소스별 병렬 소환) |
+| 3 | Q&A | 스킬 | 아티클 링크 + 질문 → 원문 기반 답변, `qa_log` 적재 |
+| 4 | Q&A 외부 조사 | 서브에이전트 | 본문만으로 부족할 때만 Q&A 스킬이 조건부 소환 — 웹 조사 fan-out을 메인 대화에서 격리 |
+| 5 | 메모 | 스킬 | 자유 덤프 → 회상 인터뷰 → `.md` 저장 → `qa_log` 정리 |
+| 6 | 아티클 브라우징 | 스킬 | 수집된 아티클을 텍스트 목록으로 다시 보기 (pull 표면) |
+| 7 | index.md 갱신 | 스크립트 | 메모 저장 후 목차 자동 갱신 |
+| 8 | 메모 검색·연결 | 서브에이전트 | 메모 폴더 전체 `.md` 검색 + 관련 메모 링크 |
+| 9 | 소스 헬스체크 | 서브에이전트 | `articles.json`에서 소스별 최신 `published_at`을 집계해 **fetch는 성공하지만 오래 무발행인 소스**를 리포트 |

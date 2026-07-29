@@ -2,28 +2,23 @@
 """fetch-source 에이전트들의 결과를 병합해 state.json·articles.json에 반영 (stdlib only).
 
 Usage:
-    python3 apply_collection_results.py <data-path> <run_ts>
+    python3 apply_collection_results.py <run_ts>
     (stdin: fetch-source 에이전트 결과 배열 JSON)
 
-stdin (JSON 배열, fetch_feed.py 출력 형식과 동일 — source_name/source_url 포함):
+stdin (JSON 배열, fetch_feed.py 출력 형식과 동일):
     [
       {"ok": true,  "source_name": "...", "source_url": "...", "entries": [
-          {"title": "...", "url": "...", "summary": "...", "published_at": "ISO8601 UTC | null"}]},
+          {"title": "...", "url": "...", "summary": "...", "published_at": "ISO8601 | null"}]},
       {"ok": false, "source_name": "...", "source_url": "...", "error": "..."}
     ]
 
 동작:
-    1. state.json 소스별 상태 갱신 — 성공: consecutive_failures=0/last_success_at=<run_ts>/alerted=false,
-       실패: consecutive_failures += 1. 이번 실행에서 처음 3에 도달(직전 2→3)하고 alerted==false인
-       소스만 실패 경고 대상으로 기록 후 alerted=true로 갱신.
-    2. 성공한 소스의 entries만 대상으로 신규 판정:
-       - published_at이 없으면 항상 신규 취급.
-       - state.json.last_run이 없으면(최초 실행) published_at의 로컬 날짜가 오늘인 것만.
-       - 있으면 published_at > last_run인 것만.
-       - articles.json 기존 url + 이번 배치 내부 중복은 제외 (url 기준).
-    3. 신규 아티클을 articles.json에 append (collected_at=<run_ts>).
-    4. 소스가 하나라도 성공했으면 state.json.last_run을 <run_ts>로 갱신 (전부 실패면 유지).
-    5. state.json, articles.json 저장.
+    1. state.json 소스별 상태 갱신 (성공: 카운터 리셋 / 실패: +1, FAILURE_THRESHOLD 도달 시 경고 1회).
+    2. 성공한 소스의 entries에서 신규만 추린다 — last_run 이후 발행분, url 기준 dedup.
+       last_run이 없으면 최초 실행으로 보고 오늘 발행분만. published_at이 없거나 파싱 불가면 신규 취급.
+    3. 신규를 articles.json에 append하고, 하나라도 성공했으면 last_run을 갱신한다(전부 실패면 유지).
+
+    run_ts·결과 배열·상태 파일이 형식에 맞지 않으면 아무것도 저장하지 않고 중단한다.
 
 stdout (JSON):
     {"new_articles": [{"title","source","summary","url"}, ...], "new_count": N,
@@ -34,25 +29,41 @@ import json
 import os
 import sys
 from datetime import datetime, timezone
+from typing import NoReturn
+
+import paths
+
+FAILURE_THRESHOLD = 3  # 연속 실패가 이 횟수에 도달하면 "죽은 소스" 경고 1회
 
 
-def die(msg):
+def die(msg) -> NoReturn:
     print(json.dumps({"ok": False, "error": msg}, ensure_ascii=False))
     sys.exit(1)
 
 
 def load_json(path, default):
+    """없으면 default, 손상됐으면 die."""
     if not os.path.exists(path):
         return default
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+    name = os.path.basename(path)
+    try:
+        with open(path, encoding="utf-8") as f:
+            doc = json.load(f)
+    except (OSError, ValueError) as e:
+        die(f"cannot read {name}: {type(e).__name__}: {e}")
+    if not isinstance(doc, dict):
+        die(f"{name} must be a JSON object")
+    return doc
 
 
 def save_json(path, obj):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(obj, f, indent=2, ensure_ascii=False)
-        f.write("\n")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(obj, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+    except OSError as e:
+        die(f"cannot write {os.path.basename(path)}: {type(e).__name__}: {e}")
 
 
 def parse_iso(s):
@@ -64,31 +75,33 @@ def parse_iso(s):
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         return dt
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         return None
 
 
 def is_new_by_date(published_at, last_run_dt, today_local_date):
     """published_at 하나가 신규 후보인지 날짜만으로 판정 (dedup은 별도)."""
     if not published_at:
-        return True  # published_at 없으면 항상 신규 취급
+        return True
     pub_dt = parse_iso(published_at)
     if pub_dt is None:
-        return True  # 파싱 불가 시에도 유실보다 포함이 안전
+        return True
     if last_run_dt is None:
         return pub_dt.astimezone().date() == today_local_date
     return pub_dt > last_run_dt
 
 
 def main():
-    if len(sys.argv) != 3:
-        die("usage: apply_collection_results.py <data-path> <run_ts>")
-    data_path = os.path.expanduser(sys.argv[1])
-    run_ts = sys.argv[2]
+    if len(sys.argv) != 2:
+        die("usage: apply_collection_results.py <run_ts>")
+    data_path = paths.data_root()
+    run_ts = sys.argv[1]
+    if parse_iso(run_ts) is None:
+        die(f"run_ts must be an ISO8601 timestamp: {run_ts!r}")
 
     try:
         results = json.load(sys.stdin)
-    except Exception as e:
+    except (OSError, ValueError) as e:
         die(f"invalid stdin JSON: {e}")
     if not isinstance(results, list):
         die("stdin must be a JSON array of fetch results")
@@ -100,8 +113,12 @@ def main():
     state_doc = load_json(state_path, {"last_run": None, "sources": {}})
     articles = articles_doc.setdefault("articles", [])
     sources_state = state_doc.setdefault("sources", {})
+    if not isinstance(articles, list):
+        die("articles.json: 'articles' must be an array")
+    if not isinstance(sources_state, dict):
+        die("state.json: 'sources' must be an object")
 
-    seen_urls = {a["url"] for a in articles if "url" in a}
+    seen_urls = {a["url"] for a in articles if isinstance(a, dict) and isinstance(a.get("url"), str)}
     last_run_dt = parse_iso(state_doc.get("last_run"))
     today_local_date = datetime.now().astimezone().date()
 
@@ -111,21 +128,35 @@ def main():
     fail_count = 0
 
     for result in results:
-        source_url = result.get("source_url")
-        source_name = result.get("source_name") or source_url
-        entry = sources_state.setdefault(
-            source_url, {"consecutive_failures": 0, "last_success_at": None, "alerted": False}
-        )
+        if not isinstance(result, dict):
+            die("each fetch result must be a JSON object")
+        source_url = result.get("source_url")  # state.json의 키
+        if not isinstance(source_url, str) or not source_url.strip():
+            die(f"fetch result missing source_url: {json.dumps(result, ensure_ascii=False)[:120]}")
+        if not isinstance(result.get("ok"), bool):
+            die(f"fetch result missing boolean 'ok' for source: {source_url}")
+        raw_name = result.get("source_name")
+        source_name = raw_name if isinstance(raw_name, str) and raw_name else source_url
 
-        if result.get("ok"):
+        entry = sources_state.get(source_url)
+        if not isinstance(entry, dict):
+            entry = {"consecutive_failures": 0, "last_success_at": None, "alerted": False}
+            sources_state[source_url] = entry
+
+        if result["ok"]:
             success_count += 1
             entry["consecutive_failures"] = 0
             entry["last_success_at"] = run_ts
             entry["alerted"] = False
 
-            for item in result.get("entries", []):
+            entries = result.get("entries") or []
+            if not isinstance(entries, list):
+                die(f"entries must be an array for source: {source_url}")
+            for item in entries:
+                if not isinstance(item, dict):
+                    die(f"each entry must be a JSON object for source: {source_url}")
                 url = item.get("url")
-                if not url or url in seen_urls:
+                if not isinstance(url, str) or not url or url in seen_urls:
                     continue
                 if not is_new_by_date(item.get("published_at"), last_run_dt, today_local_date):
                     continue
@@ -142,9 +173,10 @@ def main():
                 })
         else:
             fail_count += 1
-            before = entry["consecutive_failures"]
+            before = entry.get("consecutive_failures")
+            before = before if isinstance(before, int) else 0
             entry["consecutive_failures"] = before + 1
-            if entry["consecutive_failures"] == 3 and before == 2 and not entry["alerted"]:
+            if before + 1 == FAILURE_THRESHOLD and not entry.get("alerted"):
                 failure_warnings.append({"name": source_name, "url": source_url})
                 entry["alerted"] = True
 

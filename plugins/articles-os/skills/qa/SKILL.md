@@ -1,10 +1,9 @@
 ---
 name: qa
 description: >
-  This skill should be used when the user asks a question about a collected article,
-  e.g. "N번에 질문 있어", "이 아티클에서 X가 무슨 뜻이야", "왜 저자는 ~라고 했지",
-  or shares an article link with a question. Answers from the full original text
-  and records the exchange in the article's qa_log.
+  수집된 아티클에 대해 질문할 때 쓰는 스킬.
+  "N번에 질문 있어", "이 아티클에서 X가 무슨 뜻이야", "왜 저자는 ~라고 했지" 같은 요청이 오거나 아티클 링크와 함께 질문이 오면 이 스킬을 실행한다.
+  원문 전문을 근거로 답하고 주고받은 내용을 아티클의 `qa_log`에 기록한다.
 metadata:
   version: "0.1.0"
 ---
@@ -13,26 +12,54 @@ metadata:
 
 본문 확보(세션 한정 지연 fetch)와 `qa_log` 저장(스크립트 호출)을 메인 스레드에서 직접 수행한다 — 동기적 흐름이라 서브에이전트 위임 이득이 없다. 본문만으로 부족한 외부 조사만 조건부로 `qa-research`에 위임한다.
 
-# 아티클 Q&A
-
-원문 기반 답변 + `qa_log` 적재. 공통 규칙은 `${CLAUDE_PLUGIN_ROOT}/docs/conventions.md` 참조.
-
-## 절차
-
-1. **아티클 특정**: `<DATA>` = `${user_config.data_path}` → 번호/URL/제목으로 `articles.json`에서 찾기.
-2. **본문 확보**: 이 세션에서 이미 fetch했으면 재사용, 아니면 WebFetch(또는 실패 시 `curl -sL`)로 원문을 가져와 본문 텍스트만 마크다운으로 추출한다(`articles.json`에 저장하지 않음 — 세션 한정). **`summary`로 답하지 않는다.** 항상 원문 전문 기준.
-3. **답변**: 아티클이 실제로 말하는 내용에 근거해 답한다. 아티클의 주장과 일반적 사실을 구분해 말한다 ("저자는 ~라고 주장하는데, 일반적으로는 ~").
-4. **외부 조사 (조건부)**: 아티클 본문만으로 부족하면 — 최신 수치, 아티클이 인용한 외부 개념, 반대 견해 등 — `qa-research` 에이전트(`articles-os:qa-research`)에 조사 질문을 위임하고, 반환된 결과를 출처와 함께 답변에 통합한다. 본문으로 충분하면 소환하지 않는다.
-5. **qa_log 적재**: 답변 후 아래처럼 실행 — `asked_at` 생성, `qa_log` 병합, 저장을 스크립트가 전담한다:
+## 0. 스킬 실행 조건 확인
 
 ```bash
-echo '{"question": "<사용자 질문 원문>", "answer_digest": "<답변 핵심 2-3문장>"}' | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/append_qa_log.py" "<DATA>" "<url>"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py"
 ```
 
-`answer_digest`에는 답변 핵심 2-3문장만 남기고 전체 답변은 저장하지 않는다. `ok: false`(예: url 불일치)면 사용자에게 알리지 않고 조용히 재시도하지 않는다 — 원인(아티클 특정 오류 등)을 다시 확인한다.
+- `error` 키가 있는 경우 : 설정을 읽지 못한 상태다. `error`를 그대로 보여주고 종료한다.
+- `initialized: false` 인 경우 : "먼저 `/articles-os:setup`을 실행하세요" 안내 후 종료한다.
+- `initialized: true` 인 경우 : 이후 단계를 순차 진행한다. **데이터 경로는 스크립트들이 스스로 찾으므로 따로 넘기지 않는다.**
 
-6. 같은 세션에서 추가 질문이 이어지면 2–5를 반복한다 (본문은 이미 이 세션에 있음 — 재fetch 불필요).
+## 1. 대상 아티클 확정과 본문 확보
 
-## 마무리
+1. 0단계 결과의 `data_root` 아래 `articles.json`에서 번호/URL/제목으로 대상 아티클을 찾는다.
+2. 이 세션에서 이미 fetch했으면 재사용하고, 아니면 WebFetch(실패 시 `curl -sL`)로 원문을 가져와 본문 텍스트만 마크다운으로 추출한다. **`articles.json`에 저장하지 않는다 — 세션 한정이다.**
+
+**`summary`로 답하지 않는다.** 항상 원문 전문 기준이다.
+
+## 2. 답변
+
+아티클이 실제로 말하는 내용에 근거해 답한다. 아티클의 주장과 일반적 사실을 구분해 말한다 ("저자는 ~라고 주장하는데, 일반적으로는 ~").
+
+## 3. 외부 조사 (조건부)
+
+아티클 본문만으로 부족하면 — 최신 수치, 아티클이 인용한 외부 개념, 반대 견해 등 — `qa-research` 에이전트(`articles-os:qa-research`)에 조사 질문을 위임하고, 반환된 결과를 출처와 함께 답변에 통합한다. 
+본문으로 충분하면 소환하지 않는다.
+
+## 4. qa_log 적재
+
+답변한 뒤 아래처럼 실행한다 — `asked_at` 생성, `qa_log` 병합, 저장을 스크립트가 전담한다:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/append_qa_log.py" "<아티클 url>" <<'ARTICLES_OS_QA'
+{"question": "<사용자 질문 원문>", "answer_digest": "<답변 핵심 2-3문장>"}
+ARTICLES_OS_QA
+```
+
+질문 원문과 답변 요약에는 따옴표가 섞여 들어오므로 위 heredoc 형식을 그대로 쓴다 — 셸이 내용을 해석하지 않는다. JSON 문자열 안의 `"`는 `\"`로 이스케이프한다.
+
+`answer_digest`에는 답변 핵심 2-3문장만 남기고 전체 답변은 저장하지 않는다.
+
+실행 결과가 `ok: false`면 `error`를 보고 갈라진다. **어느 경우든 이미 사용자에게 전달한 답변은 유효하다 — 기록만 실패한 것이다.**
+
+- `stdin JSON must have a non-empty string ...` : 조립이 잘못된 것이다. 다시 조립해 재시도한다.
+- `article not found for url: ...` : 아티클 지정이 어긋난 것이다. 1단계로 돌아가 URL을 다시 확정한 뒤 재시도한다.
+- 그 밖(`articles.json not found`, 손상, 쓰기 실패 등) : 재시도로 풀리지 않는다. 기록에 실패했다는 사실을 사용자에게 알리고 넘어간다.
+
+## 5. 마무리
+
+같은 세션에서 추가 질문이 이어지면 2~4단계를 반복한다 (본문은 이미 이 세션에 있으므로 다시 fetch하지 않는다).
 
 Q&A가 일단락되면 한 줄 제안: "이 아티클 메모 남길래? 지금 나눈 Q&A도 인터뷰에 반영돼."

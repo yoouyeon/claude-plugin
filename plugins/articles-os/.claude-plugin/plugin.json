@@ -1,6 +1,6 @@
 {
   "name": "articles-os",
-  "version": "0.1.10",
+  "version": "0.1.13",
   "description": "RSS 기반 기술 아티클 학습 파이프라인 — 매일 수집·Slack 알림·원문 Q&A·회상 인터뷰 메모. Claude Code 전용(순수 터미널, 헤드리스 지원).",
   "author": {
     "name": "유연",
@@ -13,13 +13,5 @@
     "articles",
     "active-recall",
     "slack"
-  ],
-  "userConfig": {
-    "data_path": {
-      "type": "directory",
-      "title": "데이터 폴더",
-      "description": "소스·수집 이력·학습 메모를 저장할 폴더. 빈 칸으로 저장하면 현재 위치한 폴더로 설정되고, 이후 다른 곳에서 세션을 열어도 이 폴더를 사용합니다.",
-      "default": "."
-    }
-  }
+  ]
 }
