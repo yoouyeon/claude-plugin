@@ -18,20 +18,21 @@ import html
 import json
 import re
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from typing import NoReturn
 
 TIMEOUT = 30
-MAX_BYTES = 10 * 1024 * 1024
+MAX_BYTES = 30 * 1024 * 1024  # 병적으로 큰 응답을 막는 절대 상한
 UA = "articles-os/0.1 (RSS reader)"
 SUMMARY_MAX = 300
 MAX_ATTEMPTS = 2  # 최초 시도 + 1회 재시도
 
 
-def fail(msg, source_name=None, source_url=None):
+def fail(msg, source_name=None, source_url=None) -> NoReturn:
     print(json.dumps(
         {"ok": False, "source_name": source_name, "source_url": source_url, "error": msg},
         ensure_ascii=False,
@@ -149,11 +150,14 @@ def fetch_and_parse_once(url):
     })
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            data = resp.read(MAX_BYTES)
+            data = resp.read(MAX_BYTES + 1)
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"HTTP {e.code} for {url}")
     except Exception as e:
         raise RuntimeError(f"fetch error for {url}: {e}")
+
+    if len(data) > MAX_BYTES:
+        raise RuntimeError(f"response exceeded {MAX_BYTES} bytes for {url}")
 
     try:
         feed_title, entries = parse_feed(data)
