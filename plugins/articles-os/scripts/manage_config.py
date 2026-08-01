@@ -6,7 +6,7 @@ Usage:
     python3 manage_config.py sources add --name "<name>" --url "<url>"
     python3 manage_config.py sources remove --url "<url>"
     python3 manage_config.py notify get
-    python3 manage_config.py notify set --backend slack|none
+    python3 manage_config.py notify set --backend slack|discord|none
 
 config.yaml 형식(고정 — 이 형식 외 스타일은 지원하지 않음). 경로는 `paths.config_path()`:
     notes_path: '<노트 폴더 절대경로>'
@@ -14,7 +14,7 @@ config.yaml 형식(고정 — 이 형식 외 스타일은 지원하지 않음). 
       - name: '토스 기술블로그'
         url: 'https://toss.tech/rss.xml'
     notify:
-      backend: slack        # slack | none
+      backend: slack        # slack | discord | none
 
     - `notes_path`는 setup(`init_data_folder.py`)만 쓴다. 읽기는 `paths.notes_root()`.
     - `sources[].name`은 표시용, `url`이 fetch 대상. `articles.json`의 `source`가 이 `name`과 대응한다.
@@ -25,7 +25,7 @@ stdout (JSON):
                     실패 {"ok": false, "error": "duplicate url"}      (exit code 1)
     sources remove: 성공 {"ok": true, "sources": [...]}
                     실패 {"ok": false, "error": "url not found"}      (exit code 1)
-    notify get:     {"backend": "slack" | "none"}
+    notify get:     {"backend": "slack" | "discord" | "none"}
     notify set:     {"ok": true, "backend": "..."}
     I/O 실패 시:    {"ok": false, "error": "config.yaml I/O failed: ..."}  (exit code 1)
 """
@@ -36,9 +36,10 @@ import re
 import sys
 from typing import NoReturn
 
+import notify_backends
 import paths
 
-DEFAULT_BACKEND = "none"
+DEFAULT_BACKEND = notify_backends.NONE
 
 
 def config_path():
@@ -171,7 +172,7 @@ def main():
 
     p_notify = sub.add_parser("notify")
     p_notify.add_argument("action", choices=["get", "set"])
-    p_notify.add_argument("--backend", choices=["slack", "none"])
+    p_notify.add_argument("--backend", choices=notify_backends.CHOICES)
 
     args = parser.parse_args()
     try:
