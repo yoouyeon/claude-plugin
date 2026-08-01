@@ -21,7 +21,7 @@ stdin (JSON 배열, fetch_feed.py 출력 형식과 동일):
     run_ts·결과 배열·상태 파일이 형식에 맞지 않으면 아무것도 저장하지 않고 중단한다.
 
 stdout (JSON):
-    {"new_articles": [{"title","source","summary","url"}, ...], "new_count": N,
+    {"new_articles": [{"title","source","url"}, ...], "new_count": N,
      "failure_warnings": [{"name","url"}, ...], "success_sources": N, "fail_sources": N}
     실패 시: {"ok": false, "error": "..."}  (exit code 1)
 """
@@ -189,7 +189,7 @@ def main():
 
     print(json.dumps({
         "new_articles": [
-            {"title": a["title"], "source": a["source"], "summary": a["summary"], "url": a["url"]}
+            {"title": a["title"], "source": a["source"], "url": a["url"]}
             for a in new_articles
         ],
         "new_count": len(new_articles),
