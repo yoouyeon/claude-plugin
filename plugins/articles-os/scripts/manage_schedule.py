@@ -37,6 +37,8 @@ import subprocess
 import sys
 from typing import NoReturn
 
+import paths
+
 LABEL = "com.articles-os"
 COLLECT_ARGS = ["-p", "/articles-os:collect", "--allowedTools", "Bash"]
 FALLBACK_PATH_DIRS = ["/usr/local/bin", "/usr/bin", "/bin", "/opt/homebrew/bin"]
@@ -171,6 +173,8 @@ def main():
         return
 
     if args.action == "register":
+        # register만 막는다.
+        paths.require_initialized("manage_schedule.py")
         if not (0 <= args.hour <= 23):
             fail("hour must be 0-23")
         if not (0 <= args.minute <= 59):

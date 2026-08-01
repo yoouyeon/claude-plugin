@@ -4,11 +4,15 @@
 Usage (CLI):
     python3 paths.py            # {"data_root", "notes_root", "initialized"}
                                 # 읽기 실패 시 같은 세 키 + "error"
+    python3 paths.py --require-initialized
+                                # 미초기화면 {"ok": false, "error": ".."} + exit 1,
+                                # 초기화됐으면 위와 같은 출력
 
 Usage (import):
     import paths
     paths.data_root()           # ~/.articles-os (고정)
     paths.notes_root()          # config.yaml에 기록된 노트 폴더 (없으면 None)
+    paths.require_initialized() # 미초기화면 에러 JSON을 내고 exit 1 (데이터를 다루는 스크립트가 먼저 호출)
     paths.quote_scalar(v)       # config.yaml에 쓸 값 감싸기 / parse_scalar(raw)는 그 역연산
                                 # (config.yaml 소유자는 manage_config.py지만, 그쪽이 paths를
                                 #  import하므로 순환을 피하려고 이 코덱은 여기 둔다)
@@ -30,6 +34,7 @@ Usage (import):
 import json
 import os
 import re
+import sys
 
 DATA_ROOT = "~/.articles-os"
 
@@ -46,6 +51,22 @@ def config_path():
 def initialized():
     """setup이 완료됐는지 — config.yaml이 파일로 존재하는지로 판단한다."""
     return os.path.isfile(config_path())
+
+
+NOT_INITIALIZED = "not initialized (run /articles-os:setup)"
+
+
+def require_initialized(script_name=None):
+    """미초기화면 그 사실을 알리고 종료한다.
+
+    데이터를 읽거나 쓰는 스크립트는 이것을 먼저 호출한다. 그러지 않으면 "설정이 안 됐다"와
+    "설정은 됐는데 데이터가 0건이다"가 같은 출력으로 나와 호출자가 구분하지 못한다.
+    """
+    if initialized():
+        return
+    prefix = f"{script_name}: " if script_name else ""
+    print(json.dumps({"ok": False, "error": prefix + NOT_INITIALIZED}, ensure_ascii=False))
+    sys.exit(1)
 
 
 def one_line(value):
@@ -107,14 +128,20 @@ def notes_root():
 
 
 def main():
-    # 스킬 8개의 0단계가 전부 이 출력을 파싱하므로, 어떤 경우에도 traceback 대신
-    # 세 키를 갖춘 JSON을 낸다. 읽기 실패는 `error` 키로 덧붙인다.
+    strict = "--require-initialized" in sys.argv[1:]
+    if strict:
+        require_initialized()
+
+    # 어떤 경우에도 traceback 대신 세 키를 갖춘 JSON을 낸다. 읽기 실패는 `error` 키로 덧붙인다.
     result = {"data_root": data_root(), "notes_root": None, "initialized": False}
     try:
         result["initialized"] = initialized()
         result["notes_root"] = notes_root()
     except OSError as e:
         result["error"] = f"{type(e).__name__}: {e}"
+        if strict:
+            print(json.dumps({"ok": False, "error": result["error"]}, ensure_ascii=False))
+            sys.exit(1)
     print(json.dumps(result, ensure_ascii=False))
 
 

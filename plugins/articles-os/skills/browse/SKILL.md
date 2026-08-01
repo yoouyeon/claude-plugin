@@ -7,16 +7,6 @@ metadata:
   version: "0.1.0"
 ---
 
-## 0. 스킬 실행 조건 확인
-
-```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py"
-```
-
-- `error` 키가 있는 경우 : 설정을 읽지 못한 상태다. `error`를 그대로 보여주고 종료한다.
-- `initialized: false` 인 경우 : "먼저 `/articles-os:setup`을 실행하세요" 안내 후 종료한다.
-- `initialized: true` 인 경우 : 이후 단계를 순차 진행한다. **데이터 경로는 스크립트들이 스스로 찾으므로 따로 넘기지 않는다.**
-
 ## 1. 필터 결정
 
 사용자가 명시한 범위를 아래 매핑으로 옮긴다:

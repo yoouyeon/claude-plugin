@@ -6,41 +6,28 @@ metadata:
   version: "0.1.0"
 ---
 
-## 0. 상수 확인
+## 표기 규칙
 
-아래 스크립트를 실행하고, 그 JSON 결과를 `INIT_INFO`로 기억해둔다:
+`<PDATA>` = `${CLAUDE_PLUGIN_DATA}`: 변수를 치환하지 말고 글자 그대로를 리터럴로 넣는다.
 
-```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py"
-```
-
-- `<PDATA>` = `${CLAUDE_PLUGIN_DATA}`: 변수를 치환하지 말고 글자 그대로를 리터럴로 넣는다.
-- 데이터 경로는 스크립트들이 스스로 찾으므로 따로 넘기지 않는다.
-
-## 1. 스킬 실행 조건 확인
-
-- `INIT_INFO`에 `error` 키가 있는 경우 : 설정을 읽지 못한 상태다. `error`를 그대로 보여주고 종료한다.
-- `INIT_INFO.initialized`가 `false`인 경우 : "먼저 `/articles-os:setup`을 실행하세요" 안내 후 종료한다.
-- `INIT_INFO.initialized`가 `true`인 경우 : 2단계로 진행한다.
-
-## 2. 현재 상태 확인
+## 1. 현재 상태 확인
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check_notify_complete.py" "<PDATA>"
 ```
 
-- `{"complete": false, "reason": "notify backend not configured"}` : "현재 알림: 아직 설정되지 않음"이라고 보여주고 3단계로 진행한다.
-- `{"complete": true, "backend": "none"}` : "현재 알림: 꺼짐"이라고 보여주고 3단계로 진행한다.
-- `{"complete": true, "backend": "slack" | "discord"}` : "현재 알림: <Slack | Discord> 연결됨"이라고 보여주고 3단계로 진행한다.
+- `{"complete": false, "reason": "notify backend not configured"}` : "현재 알림: 아직 설정되지 않음"이라고 보여주고 2단계로 진행한다.
+- `{"complete": true, "backend": "none"}` : "현재 알림: 꺼짐"이라고 보여주고 2단계로 진행한다.
+- `{"complete": true, "backend": "slack" | "discord"}` : "현재 알림: <Slack | Discord> 연결됨"이라고 보여주고 2단계로 진행한다.
 - `{"complete": false, "backend": "slack" | "discord", "reason": "webhook not saved"}` : "현재 알림: <Slack | Discord>로 설정되어 있지만 저장된 웹훅이 없습니다 — 다시 연결해주세요"라고 안내하고, 백엔드 선택 없이 곧바로 아래 `### 웹훅 백엔드 선택 시`를 그 백엔드로 진행한다.
-- `{"complete": false, "backend": "...", "reason": "unknown backend"}` : `config.yaml`에 이 플러그인이 모르는 백엔드가 적혀 있다. 그 값을 보여주고 3단계로 진행해 다시 고르게 한다.
+- `{"complete": false, "backend": "...", "reason": "unknown backend"}` : `config.yaml`에 이 플러그인이 모르는 백엔드가 적혀 있다. 그 값을 보여주고 2단계로 진행해 다시 고르게 한다.
 - 그 밖의 `reason`(종료 코드 1) : 현재 상태를 판정하지 못한 것이다. `reason`을 그대로 보여주고 종료한다.
 
-## 3. 알림 방식 설정
+## 2. 알림 방식 설정
 
-2단계 결과에 따라 다음 중 하나를 사용자에게 묻는다:
+1단계 결과에 따라 다음 중 하나를 사용자에게 묻는다:
 
-- 2단계가 "아직 설정되지 않음"·"꺼짐"·"모르는 백엔드"였던 경우:
+- 1단계가 "아직 설정되지 않음"·"꺼짐"·"모르는 백엔드"였던 경우:
 
   > 알림을 받을 방법을 선택해주세요:
   > 1. Slack
@@ -51,7 +38,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check_notify_complete.py" "<PDATA>"
   - `2` 선택 : 아래 `### 웹훅 백엔드 선택 시`를 `discord`로 진행한다.
   - `3` 선택 : 아래 `### none 선택 시`로 진행한다.
 
-- 2단계가 "연결됨"이었던 경우 (`<현재>`는 Slack 또는 Discord):
+- 1단계가 "연결됨"이었던 경우 (`<현재>`는 Slack 또는 Discord):
 
   > 지금 `<현재>`로 연결되어 있습니다. 어떻게 할까요?
   > 1. 그대로 유지
@@ -62,7 +49,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check_notify_complete.py" "<PDATA>"
   - `2` 선택 : 위 3지선다를 다시 물어 백엔드부터 고르게 한다.
   - `3` 선택 : 아래 `### none 선택 시`로 진행한다.
 
-## 4. 알림 방식별 설정
+## 3. 알림 방식별 설정
 
 ### 웹훅 백엔드 선택 시
 

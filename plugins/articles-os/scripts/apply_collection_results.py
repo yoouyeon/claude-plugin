@@ -94,6 +94,7 @@ def is_new_by_date(published_at, last_run_dt, today_local_date):
 def main():
     if len(sys.argv) != 2:
         die("usage: apply_collection_results.py <run_ts>")
+    paths.require_initialized("apply_collection_results.py")
     data_path = paths.data_root()
     run_ts = sys.argv[1]
     if parse_iso(run_ts) is None:
