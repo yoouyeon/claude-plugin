@@ -52,11 +52,11 @@ ARTICLES_OS_NOTE
 
 본문에는 따옴표·백틱·`$`가 섞여 들어오므로 위 heredoc 형식을 그대로 쓴다 — 셸이 본문을 해석하지 않는다.
 
-실행 결과가 `ok: false`면 `error`를 보고 갈라진다:
+`ok: false`면 `error`에 따라:
 
-- `article not found for url: ...` : 아티클 지정이 어긋난 것이다. 1단계로 돌아가 URL을 다시 확정한 뒤 재시도한다.
-- `stdin body is empty` : 본문 조립이 비었다. 다시 조립해 재시도한다.
-- 그 밖(`notes_path not configured`, `articles.json not found`, 쓰기 실패 등) : 재시도로 풀리지 않는다. `error`를 그대로 보여주고 중단한다.
+- `article not found for url: ...` : 1단계로 돌아가 URL 재확정 후 재시도
+- `stdin body is empty` : 본문 다시 조립해 재시도
+- 그 밖 : 재시도로 풀리지 않는다. `error`를 그대로 보여주고 중단
 
 ## 5. 마무리
 
