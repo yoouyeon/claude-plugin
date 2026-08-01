@@ -9,7 +9,7 @@
 **Desktop 앱을 요구하지 않는다 — 터미널만으로 동작한다.** 아래 artifact·알림·스케줄링 설계는 전부 이 전제를 따른다.
 
 - **artifact 사용 안 함.** 모든 스킬 출력은 터미널 마크다운.
-- **데스크톱 알림 미지원.** Slack 웹훅 등 범용 백엔드가 `notify()` 추상화의 기본이자 사실상 유일한 실용 옵션.
+- **데스크톱 알림 미지원.** Slack·Discord 웹훅 등 범용 백엔드가 `notify()` 추상화의 기본이자 사실상 유일한 실용 옵션.
 - **스케줄링은 macOS launchd.** Claude 자체 스케줄링 기능은 배제. 설정 스킬이 `claude -p '/articles-os:collect'`를 헤드리스로 등록한다. **macOS 전용** — Linux·Windows는 지원 범위 밖이다.
 
 ## 흐름
@@ -84,14 +84,16 @@ ${CLAUDE_PLUGIN_DATA}/            # ~/.claude/plugins/data/articles-os-.../
 
 #### 알림 온보딩 흐름 (백엔드 + 시크릿 입력)
 
-웹훅 URL은 온보딩 때 사용자가 입력한다. Slack 선택 시:
+웹훅 URL은 온보딩 때 사용자가 입력한다. 웹훅 백엔드(Slack·Discord) 선택 시:
 
 ```
-1. 백엔드로 Slack 선택
-2. "Slack Incoming Webhook URL 붙여넣기" 안내
+1. 백엔드 선택 (Slack | Discord)
+2. 그 백엔드의 웹훅 URL 붙여넣기 안내
 3. 입력값을 `${CLAUDE_PLUGIN_DATA}/secrets.json` 에 저장 (config.yaml엔 안 넣음)
 4. 저장 후 테스트 알림 1회로 검증
 ```
+
+백엔드는 한 번에 하나만 쓴다 — 백엔드를 바꾸면 이전 백엔드의 웹훅은 secrets.json에서 지운다.
 
 `backend: none`을 고르면 웹훅 입력 단계는 건너뛴다.
 
@@ -135,9 +137,12 @@ config.yaml의 sources 읽기 (비어 있으면 조기 종료 + 안내)
 
 메시지 문자열 조립도 모델이 하지 않고 스크립트가 전담한다.
 
+알림은 목록이 아니라 트리거다 — 제목·출처와 링크만 싣고, 상한을 넘는 나머지는 `browse`로 넘긴다.
+백엔드별 페이로드 필드·텍스트 상한은 `scripts/notify_backends.py` 한 곳이 쥔다 — 포매터는 백엔드를 모른다.
+
 ### 설치 의존성 (외부 연결·사전 입력 없음)
 
-- Slack 알림은 Incoming Webhook URL에 직접 HTTP POST한다 — 별도 MCP 커넥터 의존성 없음.
+- Slack·Discord 알림은 웹훅 URL에 직접 HTTP POST한다 — 별도 MCP 커넥터 의존성 없음.
 - `userConfig`를 선언하지 않는다 — 설정값은 `setup`이 대화로 받아 `config.yaml`에 기록한다.
 
 ### 구성 요소 (skill / agent)

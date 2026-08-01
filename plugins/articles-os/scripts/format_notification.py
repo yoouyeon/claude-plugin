@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""수집 결과 요약 JSON을 Slack 평문 알림 메시지로 조립한다.
+"""수집 결과 요약 JSON을 평문 알림 메시지로 조립한다 (백엔드 공통).
 
 Usage:
     echo '<apply_collection_results.py 요약 JSON>' | python3 format_notification.py
 
 입력(stdin) JSON 필드:
-    new_count (int), new_articles (list of {title, source, summary, url}),
+    new_count (int), new_articles (list of {title, source, url}),
     failure_warnings (list of {name, url})
     `ok: false`가 있으면 수집 실패 요약으로 보고 `error`만 실어 한 줄로 낸다.
 
 필드가 비거나 없어도 있는 것만으로 조립한다 — 알림 하나 때문에 수집 파이프라인을 세우지 않는다.
+
+알림은 목록이 아니라 트리거다. 제목·출처와 링크만 싣고 MAX_LISTED 건까지만 나열한 뒤
+나머지는 browse로 넘긴다. 백엔드별 텍스트 상한은 여기서 보지 않는다 — notify.py가 쥔다.
 
 stdout: 조립된 메시지 텍스트 (notify.py로 그대로 파이프)
 exit code: 0 성공, 1 stdin이 JSON 객체가 아님
@@ -19,6 +22,8 @@ import sys
 from typing import NoReturn
 
 from apply_collection_results import FAILURE_THRESHOLD
+
+MAX_LISTED = 8
 
 
 def die(msg) -> NoReturn:
@@ -45,13 +50,16 @@ def build_message(data):
     lines = []
     if new_count > 0:
         lines.append(f"📚 articles-os — 신규 아티클 {new_count}건")
-        for a in new_articles:
+        listed = new_articles[:MAX_LISTED]
+        for a in listed:
             head = " — ".join(p for p in (text(a.get("title")), text(a.get("source"))) if p)
             lines.append(f"• {head}" if head else "•")
-            for field in ("summary", "url"):
-                value = text(a.get(field))
-                if value:
-                    lines.append(f"  {value}")
+            url = text(a.get("url"))
+            if url:
+                lines.append(f"  {url}")
+        remaining = new_count - len(listed)
+        if remaining > 0:
+            lines.append(f"외 {remaining}건 — /articles-os:browse 로 전체 보기")
     else:
         lines.append("📭 articles-os — 신규 아티클 없음")
 

@@ -1,7 +1,7 @@
 ---
 name: setup
 description: >
-  articles-os를 처음 설정할 때 쓰는 온보딩 스킬. 메모 폴더 지정 → 알림 연결(Slack) → 매일 수집 스케줄 등록(macOS launchd)을 순서대로 진행한다.
+  articles-os를 처음 설정할 때 쓰는 온보딩 스킬. 메모 폴더 지정 → 알림 연결(Slack·Discord) → 매일 수집 스케줄 등록(macOS launchd)을 순서대로 진행한다.
 disable-model-invocation: true
 metadata:
   version: "0.1.0"
@@ -60,7 +60,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/update_index.py"
 └── YYYY-MM-DD-제목슬러그.md
 ```
 
-시크릿(Slack 웹훅)은 위 어느 쪽에도 저장하지 않는다 — `${CLAUDE_PLUGIN_DATA}`에 따로 보관한다.
+시크릿(알림 웹훅)은 위 어느 쪽에도 저장하지 않는다 — `${CLAUDE_PLUGIN_DATA}`에 따로 보관한다.
 
 ## 3. 알림 연결
 
@@ -75,7 +75,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check_notify_complete.py" "${CLAUDE_PLUGI
 ```
 
 - `{"complete": true, ...}` 면 다음 단계로 진행한다.
-- `{"complete": false, "reason": "notify backend not configured" | "webhook not saved"}` 면 미완료 상태(notify-config 절차 중간 이탈)이므로, 사용자에게 알리고 articles-os:notify-config를 다시 안내한 뒤 재확인한다.
+- `{"complete": false, "reason": "notify backend not configured" | "webhook not saved" | "unknown backend"}` 면 미완료 상태(notify-config 절차 중간 이탈, 또는 손으로 편집된 `config.yaml`)이므로, 사용자에게 알리고 articles-os:notify-config를 다시 안내한 뒤 재확인한다.
 - 그 밖의 `reason`(종료 코드 1)은 완료 여부를 판정하지 못한 것이다. `reason`을 그대로 보여주고 중단한다 — notify-config를 다시 안내해도 해소되지 않는다.
 
 ## 4. 스케줄 등록
@@ -102,7 +102,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_schedule.py" status
 articles-os 설정 완료
 
 - 메모 폴더: <notes_root>
-- 알림: <Slack | 알림 없음>
+- 알림: <Slack | Discord | 알림 없음>
 - 수집 스케줄: <매일 HH:MM | 등록 안 함>
 
 다음 단계:

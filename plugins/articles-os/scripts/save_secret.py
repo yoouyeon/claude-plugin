@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """<plugin-data-dir>/secrets.json 관리: 저장(save) / 삭제(delete) (stdlib only).
 
-secrets.json 형식 (flat, 항상 0600):
+secrets.json 형식 (flat, 항상 0600). 키 이름은 백엔드마다 다르다:
     { "slack_webhook_url": "https://hooks.slack.com/..." }
+    { "discord_webhook_url": "https://discord.com/api/webhooks/..." }
 
 Usage:
-    python3 save_secret.py save <plugin-data-dir> --url <webhook-url>
+    python3 save_secret.py save <plugin-data-dir> --backend slack|discord --url <webhook-url>
     python3 save_secret.py delete <plugin-data-dir>
 
 <plugin-data-dir>는 호출자(SKILL.md)가 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 그대로 넘긴 값이어야 한다.
 `os.environ`으로 다시 읽지 않는다 — 다른 플러그인이 설정해둔 값이 남아 엉뚱한 디렉토리를 가리킬 수 있다.
 
 동작:
-    save   — URL이 https://hooks.slack.com/ 로 시작하는지 검증한 뒤 저장한다.
-    delete — slack_webhook_url 키만 제거한다(파일 자체·다른 키는 유지).
+    save   — URL이 그 백엔드의 허용 접두사로 시작하는지 검증한 뒤 저장한다.
+             알림 백엔드는 한 번에 하나뿐이므로 다른 백엔드의 웹훅 키는 함께 지운다.
+    delete — 모든 백엔드의 웹훅 키를 제거한다(파일 자체·그 밖의 키는 유지).
 
 stdout (JSON):
     save:   성공 {"ok": true}
@@ -27,7 +29,7 @@ import stat
 import sys
 from typing import NoReturn
 
-WEBHOOK_PREFIX = "https://hooks.slack.com/"
+import notify_backends
 
 
 def fail(msg) -> NoReturn:
@@ -62,19 +64,29 @@ def run(args):
     secrets = load_secrets(path)
 
     if args.action == "delete":
-        if secrets.pop("slack_webhook_url", None) is not None:
+        removed = [secrets.pop(key, None) for key in notify_backends.SECRET_KEYS]
+        if any(v is not None for v in removed):
             write_secrets(path, secrets)
         print(json.dumps({"ok": True}, ensure_ascii=False))
         return
 
     # save
+    if not args.backend:
+        fail("save requires --backend")
+    spec = notify_backends.BACKENDS.get(args.backend)
+    if spec is None:
+        fail(f"unknown backend: {args.backend}")
+
     url = (args.url or "").strip()
     if not url:
         fail("save requires --url")
-    if not url.startswith(WEBHOOK_PREFIX):
-        fail(f"invalid webhook url (must start with {WEBHOOK_PREFIX})")
+    if not url.startswith(spec["url_prefixes"]):
+        allowed = " 또는 ".join(spec["url_prefixes"])
+        fail(f"invalid webhook url (must start with {allowed})")
 
-    secrets["slack_webhook_url"] = url
+    for key in notify_backends.SECRET_KEYS:
+        secrets.pop(key, None)
+    secrets[spec["secret_key"]] = url
     os.makedirs(args.plugin_data_dir, exist_ok=True)
     write_secrets(path, secrets)
     print(json.dumps({"ok": True}, ensure_ascii=False))
@@ -84,6 +96,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=["save", "delete"])
     parser.add_argument("plugin_data_dir")
+    parser.add_argument("--backend", choices=sorted(notify_backends.BACKENDS))
     parser.add_argument("--url")
     args = parser.parse_args()
     try:
