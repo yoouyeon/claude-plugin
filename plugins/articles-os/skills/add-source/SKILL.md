@@ -55,9 +55,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" sources list
 
 입력받은 URL마다 아래를 반복한다:
 
-1. 검증 : `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/fetch_feed.py" "<url>"` 실행.
-   - 실행 결과가 `ok: false`면 에러를 보여주고 해당 URL은 저장하지 않은 채 다음 URL로 넘어간다. 사용자가 블로그 홈 URL만 줬으면 일반 관례(`/rss.xml`, `/feed`, `/atom.xml`, `/rss`)를 시도해 피드 URL을 찾아본다.
-   - 실행 결과가 `ok: true`면 `name`은 검증 결과의 `feed_title`을 기본 제안하고, 사용자가 바꿀 수 있게 한다.
+1. 검증 : `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/fetch_feed.py" "<url>"` 실행. 출력은 **원소 1개짜리 배열**이므로 그 첫 원소를 본다.
+   - `ok: false`면 에러를 보여주고 해당 URL은 저장하지 않은 채 다음 URL로 넘어간다. 사용자가 블로그 홈 URL만 줬으면 일반 관례(`/rss.xml`, `/feed`, `/atom.xml`, `/rss`)를 시도해 피드 URL을 찾아본다.
+   - `ok: true`면 `name`은 검증 결과의 `feed_title`을 기본 제안하고, 사용자가 바꿀 수 있게 한다.
 2. 등록 실행 : `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" sources add --name "<name>" --url "<url>"`
    - `error`가 `duplicate url`이면 이미 등록된 소스다. 중복임을 알리고 해당 URL은 건너뛴 채 다음 URL로 넘어간다.
    - 그 밖의 `ok: false`는 설정 파일에 쓰지 못한 것이다(예: `config.yaml I/O failed: ...`). **중복으로 안내하지 않는다** — `error`를 그대로 보여주고, 남은 URL도 같은 이유로 실패하므로 반복을 중단한다.

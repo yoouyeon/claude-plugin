@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""fetch-source 에이전트들의 결과를 병합해 state.json·articles.json에 반영 (stdlib only).
+"""fetch_feed.py의 소스별 결과를 병합해 state.json·articles.json에 반영 (stdlib only).
 
 Usage:
     python3 apply_collection_results.py <run_ts>
-    (stdin: fetch-source 에이전트 결과 배열 JSON)
+    (stdin: fetch_feed.py 출력 배열 JSON)
 
-stdin (JSON 배열, fetch_feed.py 출력 형식과 동일):
+stdin (JSON 배열, fetch_feed.py 출력):
     [
       {"ok": true,  "source_name": "...", "source_url": "...", "entries": [
           {"title": "...", "url": "...", "summary": "...", "published_at": "ISO8601 | null"}]},
