@@ -1,9 +1,9 @@
 ---
 name: collect
 description: >
-  articles-os의 일일 RSS 수집 파이프라인을 실행하는 오케스트레이터 스킬. "아티클 수집해줘", "수집 실행", "지금 수집 돌려줘" 같은 요청이 오거나, 
-  OS 스케줄러가 `/articles-os:collect`로 헤드리스 호출할 때 이 스킬을 실행한다. 
-  소스별 병렬 fetch → dedup·상태 갱신 → 알림 발송을 순서대로 진행한다.
+  articles-os의 일일 RSS 수집 파이프라인. OS 스케줄러가 `/articles-os:collect`로 헤드리스 호출한다.
+  수집 → dedup·상태 갱신 → 알림 발송을 순서대로 진행한다.
+disable-model-invocation: true
 metadata:
   version: "0.1.0"
 ---

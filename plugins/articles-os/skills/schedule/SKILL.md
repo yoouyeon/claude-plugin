@@ -2,6 +2,7 @@
 name: schedule
 description: >
   articles-os의 매일 수집 스케줄(macOS launchd)을 등록·변경·삭제할 때 쓰는 스킬. "스케줄 등록","수집 시간 변경", "매일 몇 시에 수집되게 해줘", "launchd 등록" 같은 요청이 오면 이 스킬을 실행한다.
+  수집 시각을 정하는 스킬이다. "지금 수집 돌려줘"처럼 즉시 실행하려는 요청은 이 스킬이 아니라 `articles-os:collect`다.
 argument-hint: [register|remove]
 arguments: [action]
 metadata:
