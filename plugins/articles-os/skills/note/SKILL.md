@@ -8,19 +8,10 @@ metadata:
   version: "0.1.0"
 ---
 
-## 권한 근거
+## 0. 데이터 경로 확인
 
-본문 확보(세션 한정 지연 fetch)와 메모 저장(`save_note.py` 호출)을 메인 스레드에서 직접 수행한다 — 회상 인터뷰가 끝난 직후 같은 턴에서 저장 결과를 바로 알려줘야 하는 흐름이라 서브에이전트로 위임하면 왕복만 늘고 이득이 없다.
-
-## 0. 스킬 실행 조건 확인
-
-```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py"
-```
-
-- `error` 키가 있는 경우 : 설정을 읽지 못한 상태다. `error`를 그대로 보여주고 종료한다.
-- `initialized: false` 인 경우 : "먼저 `/articles-os:setup`을 실행하세요" 안내 후 종료한다.
-- `initialized: true` 인 경우 : 이후 단계를 순차 진행한다. **데이터 경로는 스크립트들이 스스로 찾으므로 따로 넘기지 않는다.**
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" --require-initialized` 실행. 
+`ok: false`면 `error`를 그대로 보여주고 끝낸다. 성공하면 `data_root`를 1단계에서 쓴다.
 
 ## 1. 대상 아티클 확정과 준비
 
@@ -61,11 +52,11 @@ ARTICLES_OS_NOTE
 
 본문에는 따옴표·백틱·`$`가 섞여 들어오므로 위 heredoc 형식을 그대로 쓴다 — 셸이 본문을 해석하지 않는다.
 
-실행 결과가 `ok: false`면 `error`를 보고 갈라진다:
+`ok: false`면 `error`에 따라:
 
-- `article not found for url: ...` : 아티클 지정이 어긋난 것이다. 1단계로 돌아가 URL을 다시 확정한 뒤 재시도한다.
-- `stdin body is empty` : 본문 조립이 비었다. 다시 조립해 재시도한다.
-- 그 밖(`notes_path not configured`, `articles.json not found`, 쓰기 실패 등) : 재시도로 풀리지 않는다. `error`를 그대로 보여주고 중단한다.
+- `article not found for url: ...` : 1단계로 돌아가 URL 재확정 후 재시도
+- `stdin body is empty` : 본문 다시 조립해 재시도
+- 그 밖 : 재시도로 풀리지 않는다. `error`를 그대로 보여주고 중단
 
 ## 5. 마무리
 

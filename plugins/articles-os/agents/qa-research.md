@@ -1,18 +1,7 @@
 ---
 name: qa-research
-description: |
-  Use this agent when the qa skill needs external research beyond the article text —
-  up-to-date facts, referenced concepts, counterpoints, or claims to verify. Spawned
-  conditionally by the qa skill; not typically user-facing.
-
-  <example>
-  Context: 아티클 Q&A 중 본문에 없는 최신 정보가 필요함
-  user: "이 글에서 말한 API, 지금도 deprecated 상태야?"
-  assistant: "본문엔 없는 현재 상태라 qa-research 에이전트로 확인할게요."
-  <commentary>
-  웹 fan-out은 메인 Q&A 대화에서 격리 — 조사 결과만 받아 통합한다.
-  </commentary>
-  </example>
+description: >
+  아티클 본문만으로 부족할 때 외부 조사를 맡는 에이전트. qa 스킬이 명시적으로 소환한다.
 model: inherit
 color: blue
 tools: ["WebSearch", "WebFetch"]

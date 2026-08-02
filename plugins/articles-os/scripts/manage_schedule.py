@@ -7,7 +7,7 @@ Usage:
     python3 manage_schedule.py remove
 
 동작:
-    `~/Library/LaunchAgents/com.articles-os.plist`에 등록한다. 등록되는 커맨드는 항상 고정이다: `<claude-bin> -p '/articles-os:collect' --allowedTools 'Bash,Task'`.
+    `~/Library/LaunchAgents/com.articles-os.plist`에 등록한다. 등록되는 커맨드는 항상 고정이다: `<claude-bin> -p '/articles-os:collect' --allowedTools 'Bash'`.
 
     작업 디렉토리는 지정하지 않는다 — plist의 `WorkingDirectory` 키도 쓰지 않는다.
     PATH는 `EnvironmentVariables/PATH`로 명시한다 — 등록 시점의 PATH가 앞에 오고, 흔한 설치 경로(`/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`)로 뒤를 보강한다.
@@ -37,8 +37,10 @@ import subprocess
 import sys
 from typing import NoReturn
 
+import paths
+
 LABEL = "com.articles-os"
-COLLECT_ARGS = ["-p", "/articles-os:collect", "--allowedTools", "Bash,Task"]
+COLLECT_ARGS = ["-p", "/articles-os:collect", "--allowedTools", "Bash"]
 FALLBACK_PATH_DIRS = ["/usr/local/bin", "/usr/bin", "/bin", "/opt/homebrew/bin"]
 
 
@@ -171,6 +173,8 @@ def main():
         return
 
     if args.action == "register":
+        # register만 막는다.
+        paths.require_initialized("manage_schedule.py")
         if not (0 <= args.hour <= 23):
             fail("hour must be 0-23")
         if not (0 <= args.minute <= 59):

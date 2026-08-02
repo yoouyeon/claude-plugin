@@ -7,16 +7,6 @@ metadata:
   version: "0.1.0"
 ---
 
-## 0. 스킬 실행 조건 확인
-
-```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py"
-```
-
-- `error` 키가 있는 경우 : 설정을 읽지 못한 상태다. `error`를 그대로 보여주고 종료한다.
-- `initialized: false` 인 경우 : "먼저 `/articles-os:setup`을 실행하세요" 안내 후 종료한다.
-- `initialized: true` 인 경우 : 이후 단계를 순차 진행한다. **데이터 경로는 스크립트들이 스스로 찾으므로 따로 넘기지 않는다.**
-
 ## 1. 필터 결정
 
 사용자가 명시한 범위를 아래 매핑으로 옮긴다:
@@ -32,16 +22,16 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py"
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/filter_articles.py" --mode <모드> [--days N]
 ```
 
-실행 결과가 :
+실행 결과에 따라:
 
-- `ok: false`면 목록을 읽지 못한 것이다. `error`를 그대로 보여주고 **중단**한다 — 수집된 글이 없는 것과 구분한다.
-- `count`가 0이면 아래를 실행해 소스 등록 여부를 확인하고, `sources`가 비어 있으면 `/articles-os:add-source`를 안내한다. 소스가 있으면 아직 수집된 글이 없다고만 알린다.
+- `ok: false` : `error`를 그대로 보여주고 **중단**
+- `count`가 0 : 아래를 실행해 `sources`가 비어 있으면 `/articles-os:add-source`를 안내하고, 소스가 있으면 아직 수집된 글이 없다고만 알린다
 
   ```bash
   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" sources list
   ```
 
-- 그 밖의 경우 다음 3단계로 이어 진행한다.
+- 그 밖 : 3단계로 진행
 
 `widened: true`는 요청한 범위에 0건이라 스크립트가 전체에서 최신 10건으로 자동 확장했다는 뜻이다 — 렌더 시 "결과가 없어 전체에서 최신 10건을 보여줍니다"로 함께 알린다.
 

@@ -22,6 +22,7 @@ import sys
 
 import manage_config
 import notify_backends
+import paths
 import save_secret
 
 
@@ -37,6 +38,10 @@ def report(complete, backend=None, reason=None):
 def main():
     if len(sys.argv) != 2:
         report(False, reason="usage: check_notify_complete.py <plugin-data-dir>")
+        sys.exit(1)
+
+    if not paths.initialized():
+        report(False, reason=paths.NOT_INITIALIZED)
         sys.exit(1)
 
     try:

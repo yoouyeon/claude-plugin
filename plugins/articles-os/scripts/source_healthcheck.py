@@ -80,6 +80,7 @@ def parse_iso(ts):
 def main():
     if len(sys.argv) != 1:
         die("usage: source_healthcheck.py")
+    paths.require_initialized("source_healthcheck.py")
     data_path = paths.data_root()
 
     sources = read_sources()

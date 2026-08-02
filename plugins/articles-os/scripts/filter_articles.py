@@ -123,6 +123,7 @@ def main():
     parser.add_argument("--mode", choices=["latest_batch", "recent_days", "all"], default="recent_days")
     parser.add_argument("--days", type=int, default=7)
     args = parser.parse_args()
+    paths.require_initialized("filter_articles.py")
     if args.days < 1:
         fail("--days must be 1 or greater")
     try:

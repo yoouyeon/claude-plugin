@@ -175,6 +175,7 @@ def main():
     p_notify.add_argument("--backend", choices=notify_backends.CHOICES)
 
     args = parser.parse_args()
+    paths.require_initialized("manage_config.py")
     try:
         run(args)
     except OSError as e:
