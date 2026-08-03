@@ -8,12 +8,13 @@
 Usage:
     python3 interview_state.py start --url U --title T --source S   # stdin: 덤프 원문
     python3 interview_state.py turn --url U                         # stdin: 턴 JSON (아래)
+    python3 interview_state.py reopen --url U --axis concept,judgment
     python3 interview_state.py summary --url U                      # stdin: 요지 텍스트
     python3 interview_state.py get --url U
     python3 interview_state.py list
     python3 interview_state.py delete --url U
 
-경로는 인자로 받지 않는다 — `paths.interviews_root()`에서 스스로 찾는다.
+경로는 인자로 받지 않는다. `paths.interviews_root()`에서 스스로 찾는다.
 파일명은 아티클 제목 슬러그(`paths.slugify`)이며, 다른 url이 같은 슬러그를 쓰면 `-2`, `-3`을 붙인다.
 
 `turn`의 stdin JSON:
@@ -24,7 +25,8 @@ Usage:
 `start`/`turn`/`summary`/`get`의 성공 출력은 모두 같은 진행 상태다:
     {"ok": true, "url", "title", "source", "turns", "limit", "limit_reached",
      "closed": [...], "remaining": [...], "all_closed": bool, "resumed": bool}
-`get`은 여기에 조립 재료(`dump`, `axes`, `corrections`, `summary`)를 더한다.
+`get`은 여기에 `exists: true`와 조립 재료(`dump`, `axes`, `corrections`, `summary`)를 더한다.
+진행 중인 인터뷰가 없으면 오류가 아니라 {"ok": true, "exists": false, "url": ...}를 낸다.
 `list`는 {"ok": true, "interviews": [{"url","title","source","turns","remaining","updated_at"}, ...]}.
 
 exit code는 성공 0 / 실패 1. 실패 출력은 {"ok": false, "error": "..."}.
@@ -193,6 +195,22 @@ def cmd_turn(args, stdin):
     emit(progress(doc))
 
 
+def cmd_reopen(args, _stdin):
+    path = require_path(args.url)
+    doc = load(path)
+
+    axes = [a.strip() for a in (args.axis or "").split(",") if a.strip()]
+    if not axes:
+        fail("reopen requires --axis (comma-separated)")
+    for axis in axes:
+        if axis not in AXES:
+            fail(f"unknown axis: {axis} (expected one of {', '.join(AXES)})")
+        doc["axes"][axis]["closed"] = False
+
+    save(path, doc)
+    emit(progress(doc))
+
+
 def cmd_summary(args, stdin):
     path = require_path(args.url)
     if not stdin.strip():
@@ -204,9 +222,15 @@ def cmd_summary(args, stdin):
 
 
 def cmd_get(args, _stdin):
-    doc = load(require_path(args.url))
+    path = find_by_url(args.url)
+    if path is None:
+        emit({"ok": True, "exists": False, "url": args.url})
+        return
+
+    doc = load(path)
     result = progress(doc)
     result.update({
+        "exists": True,
         "dump": doc["dump"],
         "axes": {AXES[k]: v for k, v in doc["axes"].items()},
         "corrections": doc["corrections"],
@@ -250,13 +274,14 @@ def require_path(url):
 COMMANDS = {
     "start": cmd_start,
     "turn": cmd_turn,
+    "reopen": cmd_reopen,
     "summary": cmd_summary,
     "get": cmd_get,
     "list": cmd_list,
     "delete": cmd_delete,
 }
 
-NEEDS_URL = ("start", "turn", "summary", "get", "delete")
+NEEDS_URL = ("start", "turn", "reopen", "summary", "get", "delete")
 READS_STDIN = ("start", "turn", "summary")
 
 
@@ -266,6 +291,7 @@ def main():
     parser.add_argument("--url")
     parser.add_argument("--title")
     parser.add_argument("--source")
+    parser.add_argument("--axis")
     args = parser.parse_args()
 
     paths.require_initialized("interview_state.py")
