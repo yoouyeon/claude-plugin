@@ -19,7 +19,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/source_healthcheck.py"
 
 실행 결과가 :
 
-- `ok: false`면 목록을 읽지 못한 것이다. `error`를 그대로 보여주고 **중단**한다 — 소스가 없는 것과 구분한다.
+- `ok: false`면 목록을 읽지 못한 것이다. `error`를 그대로 보여주고 **중단**한다. 소스가 없는 것과 구분한다.
 - 그 밖의 경우 `sources`를 번호를 붙인 마크다운 표로 보여준다: `이름 · 최신 발행일 · 수집 건수 · 연속 실패 · 판정`. 목록이 비어 있으면 그 사실을 안내한다.
 
 `status`가 `normal`이 아닌 소스가 있으면 표 아래에 조치를 한 줄씩 덧붙인다. `dead`는 제거 검토, `quiet`는 정말 발행이 끊겼는지 원문 확인, `uncollected`는 아직 수집된 글이 없음.
@@ -48,7 +48,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/source_healthcheck.py"
    - `ok: true`면 `name`은 검증 결과의 `feed_title`을 기본 제안하고, 사용자가 바꿀 수 있게 한다.
 2. 등록 실행 : `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" sources add --name "<name>" --url "<url>"`
    - `error`가 `duplicate url`이면 이미 등록된 소스다. 중복임을 알리고 해당 URL은 건너뛴 채 다음 URL로 넘어간다.
-   - 그 밖의 `ok: false`는 설정 파일에 쓰지 못한 것이다(예: `config.yaml I/O failed: ...`). **중복으로 안내하지 않는다** — `error`를 그대로 보여주고, 남은 URL도 같은 이유로 실패하므로 반복을 중단한다.
+   - 그 밖의 `ok: false`는 설정 파일에 쓰지 못한 것이다(예: `config.yaml I/O failed: ...`). **중복으로 안내하지 않는다**. `error`를 그대로 보여주고, 남은 URL도 같은 이유로 실패하므로 반복을 중단한다.
 
 모든 URL 처리가 끝나면 [5. 마무리](#5-마무리)로 간다.
 
@@ -66,8 +66,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/source_healthcheck.py"
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" sources remove --url "<url>"
 ```
 
-- `ok: false`면 에러를 보여주고 중단한다. `error`가 `url not found`면 이미 지워졌거나 URL이 어긋난 것이고, 그 밖(예: `config.yaml I/O failed: ...`)은 설정 파일을 읽거나 쓰지 못한 것이다 — 둘을 구분해 안내한다.
-- `ok: true`면 [5. 마무리](#5-마무리)로 간다. `articles.json`의 이미 수집된 아티클은 그대로 둔다 — 건드리지 않는다.
+- `ok: false`면 에러를 보여주고 중단한다. `error`가 `url not found`면 이미 지워졌거나 URL이 어긋난 것이고, 그 밖(예: `config.yaml I/O failed: ...`)은 설정 파일을 읽거나 쓰지 못한 것이다. 둘을 구분해 안내한다.
+- `ok: true`면 [5. 마무리](#5-마무리)로 간다. `articles.json`의 이미 수집된 아티클은 그대로 둔다. 건드리지 않는다.
 
 ## 5. 마무리
 

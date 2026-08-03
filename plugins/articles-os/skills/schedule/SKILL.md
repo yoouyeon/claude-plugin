@@ -28,7 +28,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_schedule.py" status
 
 - `"os"`가 `macos`가 아니면 "예약 수집은 macOS에서만 지원합니다."라고 안내한 뒤 종료한다.
 - `"registered": true`면 현재 등록된 시각(`hour:minute`)을 보여주고, 시각 변경이 맞는지 사용자에게 확인한 뒤 [2-2. 실행 파일 경로 확정](#2-2-실행-파일-경로-확정) 단계로 이동한다.
-- `"registered": false`면 그대로 [2-2. 실행 파일 경로 확정](#2-2-실행-파일-경로-확정) 단계로 이동한다. `error` 키가 함께 있으면 등록된 plist를 읽지 못한 것이다 — 등록이 그 파일을 덮어쓰므로 그대로 진행한다.
+- `"registered": false`면 그대로 [2-2. 실행 파일 경로 확정](#2-2-실행-파일-경로-확정) 단계로 이동한다. `error` 키가 함께 있으면 등록된 plist를 읽지 못한 것이다. 등록이 그 파일을 덮어쓰므로 그대로 진행한다.
 
 ### 2-2. 실행 파일 경로 확정
 
@@ -49,7 +49,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_schedule.py" status
 
 1. 등록 실행
 
-   CAUTION : **예약 실행은 user scope 설치를 전제로 한다** — OS 스케줄러는 임의의 작업 디렉토리에서 `claude`를 띄우므로, project/local scope로 설치돼 있으면 `/articles-os:collect` 커맨드를 찾지 못한다. 수집 데이터 자체는 고정 경로에 있어 작업 디렉토리와 무관하다.
+   CAUTION : **예약 실행은 user scope 설치를 전제로 한다**. OS 스케줄러는 임의의 작업 디렉토리에서 `claude`를 띄우므로, project/local scope로 설치돼 있으면 `/articles-os:collect` 커맨드를 찾지 못한다. 수집 데이터 자체는 고정 경로에 있어 작업 디렉토리와 무관하다.
 
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_schedule.py" register --claude-bin "<CLAUDE_BIN>" --hour <HH> --minute <MM>
