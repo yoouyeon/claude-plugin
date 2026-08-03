@@ -9,10 +9,10 @@ Usage:
 동작:
     `~/Library/LaunchAgents/com.articles-os.plist`에 등록한다. 등록되는 커맨드는 항상 고정이다: `<claude-bin> -p '/articles-os:collect' --allowedTools 'Bash'`.
 
-    작업 디렉토리는 지정하지 않는다 — plist의 `WorkingDirectory` 키도 쓰지 않는다.
-    PATH는 `EnvironmentVariables/PATH`로 명시한다 — 등록 시점의 PATH가 앞에 오고, 흔한 설치 경로(`/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`)로 뒤를 보강한다.
+    작업 디렉토리는 지정하지 않는다. plist의 `WorkingDirectory` 키도 쓰지 않는다.
+    PATH는 `EnvironmentVariables/PATH`로 명시한다. 등록 시점의 PATH가 앞에 오고, 흔한 설치 경로(`/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`)로 뒤를 보강한다.
 
-    register는 멱등적이다 — 다시 실행해도 중복 등록이 생기지 않는다.
+    register는 멱등적이다. 다시 실행해도 중복 등록이 생기지 않는다.
     `--claude-bin`은 실행 가능한 파일이어야 하며, 절대경로로 확정해 기록한다.
 
     예약 실행은 user scope 설치를 전제로 한다: project/local scope로 설치하면 스케줄러가 `/articles-os:collect` 커맨드를 찾지 못한다.
@@ -63,7 +63,7 @@ def detect_os():
 
 
 def schedule_path():
-    """plist에 넣을 PATH — 등록 시점의 PATH를 앞에 두고 흔한 설치 경로로 뒤를 보강한다.
+    """plist에 넣을 PATH. 등록 시점의 PATH를 앞에 두고 흔한 설치 경로로 뒤를 보강한다.
 
     등록은 사용자의 대화형 세션에서 일어나므로 그 PATH가 대화형에서 실제로 동작하는 도구를 가리킨다.
     고정 목록을 앞에 두면 예약 실행만 다른 `python3`를 집어 대화형과 결과가 갈린다.
@@ -166,7 +166,7 @@ def main():
             result = macos_status()
         except (OSError, ValueError) as e:
             # plist가 깨졌거나 읽을 수 없는 경우. registered를 false로 두어 스킬이 재등록을
-            # 유도하게 한다 — register는 기존 plist를 읽지 않고 덮어쓰므로 그대로 복구된다.
+            # 유도하게 한다. register는 기존 plist를 읽지 않고 덮어쓰므로 그대로 복구된다.
             result = {"os": "macos", "registered": False, "error": f"{type(e).__name__}: {e}"}
         result["claude_cli"] = check_claude_cli()
         print(json.dumps(result, ensure_ascii=False))

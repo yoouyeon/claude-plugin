@@ -11,7 +11,7 @@ Usage:
     - slack / discord   → <plugin-data-dir>/secrets.json 의 웹훅 URL로 POST
 
 백엔드별 페이로드 필드·텍스트 상한은 notify_backends.BACKENDS 가 쥔다.
-상한이 있는 백엔드는 초과분을 잘라서 보낸다 — 길이 때문에 알림 전체를 놓치지 않기 위해서다.
+상한이 있는 백엔드는 초과분을 잘라서 보낸다. 길이 때문에 알림 전체를 놓치지 않기 위해서다.
 
 <plugin-data-dir>는 호출자(SKILL.md)가 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 그대로 넘긴 값이어야 한다.
 
@@ -61,7 +61,7 @@ def read_webhook(plugin_data_dir, secret_key):
         with open(secrets_file, encoding="utf-8") as f:
             secrets = json.load(f)
     except (OSError, ValueError) as e:
-        # 메시지에 파일 내용은 넣지 않는다 — 웹훅 URL이 노출될 수 있다.
+        # 메시지에 파일 내용은 넣지 않는다. 웹훅 URL이 노출될 수 있다.
         die(f"cannot read secrets.json: {type(e).__name__}")
     if not isinstance(secrets, dict):
         die("secrets.json is not a JSON object (run notify-config)")
@@ -110,7 +110,7 @@ def main():
             },
         )
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            # Slack은 200, Discord는 204를 준다 — 2xx면 발송된 것으로 본다.
+            # Slack은 200, Discord는 204를 준다. 2xx면 발송된 것으로 본다.
             if not 200 <= resp.status < 300:
                 die(f"{backend} returned HTTP {resp.status}")
     except urllib.error.HTTPError as e:

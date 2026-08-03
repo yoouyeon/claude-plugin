@@ -7,9 +7,9 @@ Usage:
 동작:
     두 곳을 만든다.
 
-    1. 기계 상태 — `paths.data_root()`(`~/.articles-os`, 고정)에 articles.json / state.json 생성.
-    2. 사용자 산출물 — `<노트 폴더>/notes/` 생성하고, 그 절대경로를 config.yaml의 `notes_path`에 기록한다
-                    (config.yaml은 이 단계에서 `manage_config`가 만든다 — 가장 마지막에 쓰므로 중간에 실패하면 `paths.initialized()`가 false로 남는다).
+    1. 기계 상태. `paths.data_root()`(`~/.articles-os`, 고정)에 articles.json / state.json 생성.
+    2. 사용자 산출물. `<노트 폴더>/notes/` 생성하고, 그 절대경로를 config.yaml의 `notes_path`에 기록한다
+                    (config.yaml은 이 단계에서 `manage_config`가 만든다, 가장 마지막에 쓰므로 중간에 실패하면 `paths.initialized()`가 false로 남는다).
                     이후 모든 스킬은 이 기록을 통해 노트 폴더를 찾는다.
 
     articles.json·state.json은 이미 있으면 건드리지 않는다.
@@ -64,7 +64,7 @@ def main():
                 with open(full, "w", encoding="utf-8") as f:
                     f.write(content)
 
-        # 2. 사용자 산출물 + notes_path 기록 (config.yaml 쓰기는 항상 마지막 — 순서 바꾸지 말 것)
+        # 2. 사용자 산출물 + notes_path 기록 (config.yaml 쓰기는 항상 마지막, 순서 바꾸지 말 것)
         os.makedirs(notes_root, exist_ok=True)
         config_file = paths.config_path()
         config = manage_config.load_config(config_file)

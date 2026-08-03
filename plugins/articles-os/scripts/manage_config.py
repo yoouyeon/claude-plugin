@@ -8,7 +8,7 @@ Usage:
     python3 manage_config.py notify get
     python3 manage_config.py notify set --backend slack|discord|none
 
-config.yaml 형식(고정 — 이 형식 외 스타일은 지원하지 않음). 경로는 `paths.config_path()`:
+config.yaml 형식(고정, 이 형식 외 스타일은 지원하지 않음). 경로는 `paths.config_path()`:
     notes_path: '<노트 폴더 절대경로>'
     sources:
       - name: '토스 기술블로그'
@@ -49,7 +49,7 @@ def config_path():
 def load_config(path):
     """config.yaml을 dict로 읽는다.
 
-    `backend_set`은 `notify.backend` 키가 실제로 있었는지다 — 없으면 `backend`가
+    `backend_set`은 `notify.backend` 키가 실제로 있었는지다. 없으면 `backend`가
     DEFAULT_BACKEND로 채워지므로, "명시적으로 none"과 "키가 없음"을 구분하려면 이 값을 본다.
     """
     if not os.path.exists(path):
@@ -94,7 +94,7 @@ def load_config(path):
 
 
 def save_config(path, config):
-    """`notify` 블록은 `backend_set`이 true일 때만 쓴다 — 블록이 없는 상태가 "설정한 적 없음"이다."""
+    """`notify` 블록은 `backend_set`이 true일 때만 쓴다. 블록이 없는 상태가 "설정한 적 없음"이다."""
     lines = []
     if config.get("notes_path"):
         lines.append(f"notes_path: {paths.quote_scalar(config['notes_path'])}")

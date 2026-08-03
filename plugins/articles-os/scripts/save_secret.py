@@ -10,12 +10,12 @@ Usage:
     python3 save_secret.py delete <plugin-data-dir>
 
 <plugin-data-dir>는 호출자(SKILL.md)가 `${CLAUDE_PLUGIN_DATA}` 플레이스홀더를 그대로 넘긴 값이어야 한다.
-`os.environ`으로 다시 읽지 않는다 — 다른 플러그인이 설정해둔 값이 남아 엉뚱한 디렉토리를 가리킬 수 있다.
+`os.environ`으로 다시 읽지 않는다. 다른 플러그인이 설정해둔 값이 남아 엉뚱한 디렉토리를 가리킬 수 있다.
 
 동작:
-    save   — URL이 그 백엔드의 허용 접두사로 시작하는지 검증한 뒤 저장한다.
+    save: URL이 그 백엔드의 허용 접두사로 시작하는지 검증한 뒤 저장한다.
              알림 백엔드는 한 번에 하나뿐이므로 다른 백엔드의 웹훅 키는 함께 지운다.
-    delete — 모든 백엔드의 웹훅 키를 제거한다(파일 자체·그 밖의 키는 유지).
+    delete: 모든 백엔드의 웹훅 키를 제거한다(파일 자체·그 밖의 키는 유지).
 
 stdout (JSON):
     save:   성공 {"ok": true}

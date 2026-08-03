@@ -14,7 +14,7 @@ stdin (JSON 배열, fetch_feed.py 출력):
 
 동작:
     1. state.json 소스별 상태 갱신 (성공: 카운터 리셋 / 실패: +1, FAILURE_THRESHOLD 도달 시 경고 1회).
-    2. 성공한 소스의 entries에서 신규만 추린다 — last_run 이후 발행분, url 기준 dedup.
+    2. 성공한 소스의 entries에서 신규만 추린다. last_run 이후 발행분, url 기준 dedup.
        last_run이 없으면 최초 실행으로 보고 오늘 발행분만. published_at이 없거나 파싱 불가면 신규 취급.
     3. 신규를 articles.json에 append하고, 하나라도 성공했으면 last_run을 갱신한다(전부 실패면 유지).
 

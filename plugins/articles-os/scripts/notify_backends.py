@@ -4,11 +4,11 @@
 백엔드를 추가할 때 이 파일만 고치면 save_secret·check_notify_complete·notify가 함께 따라온다.
 
 필드:
-    secret_key    — secrets.json에서 웹훅 URL을 담는 키
-    payload_field — POST 본문에서 메시지 텍스트가 들어가는 필드
-    url_prefixes  — 저장 시 허용하는 URL 접두사
-    user_agent    — 요청에 실을 User-Agent
-    max_chars     — 백엔드가 받는 텍스트 상한 (None이면 상한 없음)
+    secret_key: secrets.json에서 웹훅 URL을 담는 키
+    payload_field: POST 본문에서 메시지 텍스트가 들어가는 필드
+    url_prefixes: 저장 시 허용하는 URL 접두사
+    user_agent: 요청에 실을 User-Agent
+    max_chars: 백엔드가 받는 텍스트 상한 (None이면 상한 없음)
 """
 
 NONE = "none"
@@ -39,7 +39,7 @@ BACKENDS = {
     },
 }
 
-# secrets.json에 웹훅이 실릴 수 있는 모든 키 — 삭제·교체 때 훑는다.
+# secrets.json에 웹훅이 실릴 수 있는 모든 키. 삭제·교체 때 훑는다.
 SECRET_KEYS = tuple(spec["secret_key"] for spec in BACKENDS.values())
 
 # config.yaml의 notify.backend가 가질 수 있는 값.

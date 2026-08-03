@@ -32,7 +32,7 @@ OS 스케줄러가 헤드리스로 호출하므로 **비대화형으로 완주�
 
 ## 3. 수집·저장
 
-아래 파이프를 그대로 한 번에 실행한다. **중간 출력을 읽거나 다시 실어 나르지 않는다** — 소스 목록과 fetch된 아티클 전문이 프로세스 사이로만 흐른다:
+아래 파이프를 그대로 한 번에 실행한다. **중간 출력을 읽거나 다시 실어 나르지 않는다**. 소스 목록과 fetch된 아티클 전문이 프로세스 사이로만 흐른다:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" sources list \
@@ -49,17 +49,17 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/manage_config.py" sources list \
   "failure_warnings": [{"name","url"}], "success_sources": 0, "fail_sources": 0 }
 ```
 
-`ok: false`면 아무것도 저장되지 않은 것이다 — 그 출력을 그대로 4단계로 넘긴다(수집 실패로 알림이 나간다). 5단계 리포트에도 실패로 적는다. **신규 0건으로 취급하지 않는다.**
+`ok: false`면 아무것도 저장되지 않은 것이다. 그 출력을 그대로 4단계로 넘긴다(수집 실패로 알림이 나간다). 5단계 리포트에도 실패로 적는다. **신규 0건으로 취급하지 않는다.**
 
 ## 4. 알림
 
-**항상** 보낸다 — 신규가 0건이어도 "신규 없음"을, 3단계가 실패했으면 "수집 실패"를 알린다 (조용히 스킵하지 않는다). 3단계 출력 JSON을 그대로 stdin에 실어 포맷팅 스크립트에 넘기고, 그 출력을 전송 스크립트로 파이프한다.:
+**항상** 보낸다. 신규가 0건이어도 "신규 없음"을, 3단계가 실패했으면 "수집 실패"를 알린다 (조용히 스킵하지 않는다). 3단계 출력 JSON을 그대로 stdin에 실어 포맷팅 스크립트에 넘기고, 그 출력을 전송 스크립트로 파이프한다.:
 
 ```bash
 echo '<3단계 출력 JSON>' | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/format_notification.py" | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/notify.py" "${CLAUDE_PLUGIN_DATA}"
 ```
 
-`${CLAUDE_PLUGIN_DATA}` 자리표시자를 그대로 적는다 — 스크립트 내부에서 환경변수로 다시 읽지 않는다.
+`${CLAUDE_PLUGIN_DATA}` 자리표시자를 그대로 적는다. 스크립트 내부에서 환경변수로 다시 읽지 않는다.
 
 알림 전송 실패는 stderr 내용을 결과에 남기되 파이프라인 실패로 치지 않는다.
 
@@ -67,4 +67,4 @@ echo '<3단계 출력 JSON>' | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/format_not
 
 터미널(과 로그)에 요약 출력: `success_sources`/`fail_sources`, `new_count`건 목록, 알림 발송 여부. `new_count`가 0이면 "신규 없음"이라고 명시한다.
 
-3단계가 `ok: false`였으면 위 필드가 없다 — `error`를 그대로 싣고 저장된 것이 없다고 명시한다.
+3단계가 `ok: false`였으면 위 필드가 없다. `error`를 그대로 싣고 저장된 것이 없다고 명시한다.

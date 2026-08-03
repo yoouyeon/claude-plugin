@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""notes/index.md 목차 재생성 (결정적 — 에이전트 불필요).
+"""notes/index.md 목차 재생성 (결정적, 에이전트 불필요).
 
 Usage:
     python3 update_index.py
@@ -22,12 +22,12 @@ def die(msg) -> NoReturn:
 
 
 def md_text(value):
-    """링크 텍스트로 안전하게 — 홀로 있는 `[`·`]`가 링크를 끊는다."""
+    """링크 텍스트로 안전하게. 홀로 있는 `[`·`]`가 링크를 끊는다."""
     return value.replace("[", r"\[").replace("]", r"\]")
 
 
 def md_url(value):
-    """링크 대상으로 안전하게 — 괄호·공백이 든 URL은 `<...>`로 감싸 끝을 정확히 잡는다.
+    """링크 대상으로 안전하게. 괄호·공백이 든 URL은 `<...>`로 감싸 끝을 정확히 잡는다.
 
     `<`·`>`는 감싸기 전에 퍼센트 인코딩한다. 그대로 두면 감싼 괄호가 그 자리에서 닫혀버린다.
     """
@@ -41,7 +41,7 @@ def parse_note(path):
         with open(path, encoding="utf-8") as f:
             text = f.read()
     except (OSError, ValueError):
-        # 이 노트만 메타데이터 없이 넘어간다 — 하나 때문에 목차 생성을 멈추지 않는다.
+        # 이 노트만 메타데이터 없이 넘어간다. 하나 때문에 목차 생성을 멈추지 않는다.
         return meta
     m = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, flags=re.S)
     if m:

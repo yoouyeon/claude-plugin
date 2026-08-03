@@ -16,10 +16,10 @@ stdout (JSON):
     ]}
 
 분류 기준:
-    dead        — consecutive_failures >= FAILURE_THRESHOLD (apply_collection_results와 공유)
-    quiet       — consecutive_failures == 0 이고 latest_published_at 이 QUIET_THRESHOLD_DAYS 이상 전 (fetch는 성공하지만 오래 무발행 — 연속 실패 알림의 사각지대)
-    uncollected — 등록됐지만 article_count == 0
-    normal      — 나머지
+    dead: consecutive_failures >= FAILURE_THRESHOLD (apply_collection_results와 공유)
+    quiet: consecutive_failures == 0 이고 latest_published_at 이 QUIET_THRESHOLD_DAYS 이상 전 (fetch는 성공하지만 오래 무발행이라 연속 실패 알림의 사각지대)
+    uncollected: 등록됐지만 article_count == 0
+    normal: 나머지
 """
 import json
 import os
@@ -51,7 +51,7 @@ def read_sources():
 
 
 def read_json(path, default):
-    """없으면 default. 손상됐으면 die — 조용히 default로 넘어가면 진단 결과가 거짓이 된다."""
+    """없으면 default. 손상됐으면 die. 조용히 default로 넘어가면 진단 결과가 거짓이 된다."""
     if not os.path.exists(path):
         return default
     name = os.path.basename(path)

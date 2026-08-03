@@ -5,9 +5,9 @@ Usage:
     python3 filter_articles.py --mode latest_batch|recent_days|all [--days N]
 
 모드:
-    latest_batch — collected_at이 가장 최근인 배치(같은 실행에서 수집된 것 전체)만.
-    recent_days  — collected_at이 (now - N일) 이후인 것만. N 기본값 7.
-    all          — 전체.
+    latest_batch: collected_at이 가장 최근인 배치(같은 실행에서 수집된 것 전체)만.
+    recent_days: collected_at이 (now - N일) 이후인 것만. N 기본값 7.
+    all: 전체.
 
 recent_days 결과가 0건이면 필터를 무시하고 전체에서 published_at 최신 10건을 대신 반환한다 (widened: true로 표시).
 전체가 0건이면 확장하지 않는다 (widened: false, count: 0).
@@ -37,7 +37,7 @@ def fail(msg) -> NoReturn:
 
 
 def load_articles():
-    """없으면 빈 목록. 손상됐으면 die — 빈 결과를 내면 "수집된 게 없다"로 오해된다."""
+    """없으면 빈 목록. 손상됐으면 die. 빈 결과를 내면 "수집된 게 없다"로 오해된다."""
     path = os.path.join(paths.data_root(), "articles.json")
     if not os.path.exists(path):
         return []
@@ -52,7 +52,7 @@ def load_articles():
 
 
 def parse_ts(value):
-    """타임존이 없으면 UTC로 본다 — aware/naive가 섞이면 비교가 TypeError를 낸다."""
+    """타임존이 없으면 UTC로 본다. aware/naive가 섞이면 비교가 TypeError를 낸다."""
     if not value:
         return None
     try:
@@ -115,7 +115,7 @@ def run(args):
     elif args.mode == "recent_days":
         cutoff = datetime.now(timezone.utc) - timedelta(days=args.days)
         selected = [a for a in articles if (parse_ts(a.get("collected_at")) or datetime.min.replace(tzinfo=timezone.utc)) >= cutoff]
-        # 넓힐 대상이 있을 때만 확장으로 표시한다 — 전체가 0건이면 확장해도 보여줄 것이 없다.
+        # 넓힐 대상이 있을 때만 확장으로 표시한다. 전체가 0건이면 확장해도 보여줄 것이 없다.
         if not selected and articles:
             widened = True
             mode_used = "all"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """RSS/Atom/RDF 피드 fetch + 파싱 (stdlib only).
 
-소스를 병렬로 가져온다. 입력 채널은 둘이지만 출력 계약은 하나다 — **항상 배열**이다.
+소스를 병렬로 가져온다. 입력 채널은 둘이지만 출력 계약은 하나다. **항상 배열**이다.
 
 Usage:
     python3 fetch_feed.py <feed-url> [--source-name NAME]   # 소스 하나 (URL에 특수문자가 섞여도 안전)
@@ -158,7 +158,7 @@ def parse_feed(data):
 def fetch_and_parse_once(url):
     """한 번의 fetch+파싱 시도. 성공 시 (feed_title, entries), 실패 시 에러 메시지를 raise."""
     try:
-        # Request() 생성도 try 안에 둔다 — 지원하지 않는 URL 형식이면 여기서 ValueError가 난다.
+        # Request() 생성도 try 안에 둔다. 지원하지 않는 URL 형식이면 여기서 ValueError가 난다.
         req = urllib.request.Request(url, headers={
             "User-Agent": UA,
             "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
