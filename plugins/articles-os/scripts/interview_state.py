@@ -9,7 +9,7 @@ Usage:
     python3 interview_state.py start --url U --title T --source S   # stdin: 덤프 원문
     python3 interview_state.py turn --url U                         # stdin: 턴 JSON (아래)
     python3 interview_state.py reopen --url U --axis concept,judgment
-    python3 interview_state.py summary --url U                      # stdin: 요지 텍스트
+    python3 interview_state.py summary --url U                      # stdin: 요지 텍스트 (300자 이내)
     python3 interview_state.py get --url U
     python3 interview_state.py list
     python3 interview_state.py delete --url U
@@ -50,6 +50,9 @@ AXES = {
 
 # 사용자에게 계속할지 물어보는 지점. 종료 기준이 아니라 안전장치다.
 TURN_LIMIT = 6
+
+# 요지 상한(자). 넘으면 메모에서 요지가 본문보다 길어져 사용자 발화가 주인이라는 구조가 흔들린다.
+SUMMARY_MAX_CHARS = 300
 
 
 def fail(msg) -> NoReturn:
@@ -213,10 +216,13 @@ def cmd_reopen(args, _stdin):
 
 def cmd_summary(args, stdin):
     path = require_path(args.url)
-    if not stdin.strip():
+    summary = stdin.strip()
+    if not summary:
         fail("stdin summary is empty")
+    if len(summary) > SUMMARY_MAX_CHARS:
+        fail(f"summary is {len(summary)} chars, max {SUMMARY_MAX_CHARS} (2~3 sentences)")
     doc = load(path)
-    doc["summary"] = stdin.strip()
+    doc["summary"] = summary
     save(path, doc)
     emit(progress(doc))
 

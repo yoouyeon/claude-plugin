@@ -100,6 +100,7 @@ ARTICLES_OS_TURN
 ## 5. 요지와 마무리
 
 원문을 근거로 "이 글은 무슨 주장을 하는가"를 2~3문장으로 써서 적재한다. 사용자 발화가 아니라 아티클 요약이다.
+**300자를 넘으면 스크립트가 거부한다.** 아티클 요약문이 아니라 주장 한 줄로 좁힌다.
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/interview_state.py" summary --url "<아티클 url>" <<'ARTICLES_OS_SUMMARY'
