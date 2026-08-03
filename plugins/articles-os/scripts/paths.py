@@ -12,7 +12,9 @@ Usage (import):
     import paths
     paths.data_root()           # ~/.articles-os (고정)
     paths.notes_root()          # config.yaml에 기록된 노트 폴더 (없으면 None)
+    paths.interviews_root()     # ~/.articles-os/interviews (진행 중인 인터뷰)
     paths.require_initialized() # 미초기화면 에러 JSON을 내고 exit 1 (데이터를 다루는 스크립트가 먼저 호출)
+    paths.slugify(title)        # 제목 -> 파일명 슬러그 (메모와 인터뷰 파일이 같은 규칙을 쓴다)
     paths.quote_scalar(v)       # config.yaml에 쓸 값 감싸기 / parse_scalar(raw)는 그 역연산
                                 # (config.yaml 소유자는 manage_config.py지만, 그쪽이 paths를
                                 #  import하므로 순환을 피하려고 이 코덱은 여기 둔다)
@@ -46,6 +48,30 @@ def data_root():
 
 def config_path():
     return os.path.join(data_root(), "config.yaml")
+
+
+def interviews_root():
+    """진행 중인 인터뷰를 두는 경로. 메모로 승격되기 전까지의 기계 상태다."""
+    return os.path.join(data_root(), "interviews")
+
+
+# 슬러그 상한(바이트). 긴 제목이 그대로 파일명이 되면 셸·파인더에서 다루기 나빠진다.
+# 한글은 UTF-8에서 글자당 3바이트라 40자쯤에서 걸린다. 원제목은 frontmatter·인터뷰 파일에 온전히 남는다.
+SLUG_MAX_BYTES = 120
+
+
+def slugify(title):
+    """한글 유지, 공백 -> '-', 특수문자 제거, SLUG_MAX_BYTES로 자름."""
+    s = re.sub(r"[^\w\s-]", "", title, flags=re.UNICODE)
+    s = re.sub(r"\s+", "-", s.strip())
+    s = re.sub(r"-+", "-", s)
+    s = s.strip("-")
+
+    encoded = s.encode("utf-8")
+    if len(encoded) > SLUG_MAX_BYTES:
+        # errors="ignore"가 잘린 멀티바이트 문자 조각을 떨어뜨린다.
+        s = encoded[:SLUG_MAX_BYTES].decode("utf-8", "ignore").rstrip("-")
+    return s or "untitled"
 
 
 def initialized():

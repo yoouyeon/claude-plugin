@@ -14,9 +14,11 @@ recent_days 결과가 0건이면 필터를 무시하고 전체에서 published_a
 
 정렬은 항상 published_at 내림차순(없으면 맨 뒤, collected_at으로 2차 정렬).
 
+진행 중인 인터뷰가 있는 아티클은 `interview`에 {"turns", "remaining"}이 실린다. 없으면 null.
+
 stdout (JSON):
     {"mode_used": "...", "days": N|null, "widened": bool, "count": N,
-     "articles": [{"url","title","source","published_at","summary"}, ...]}
+     "articles": [{"url","title","source","published_at","summary","interview"}, ...]}
 """
 import argparse
 import json
@@ -25,6 +27,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from typing import NoReturn
 
+import interview_state
 import paths
 
 
@@ -67,13 +70,32 @@ def sort_key(article):
     )
 
 
-def to_view(article):
+def interview_index():
+    """url -> {turns, remaining}. 손상된 인터뷰 파일은 건너뛴다."""
+    index = {}
+    for path in interview_state.interview_files():
+        try:
+            doc = interview_state.load(path)
+            url = doc["url"]
+            axes = doc["axes"]
+        except (OSError, ValueError, KeyError):
+            continue
+        index[url] = {
+            "turns": doc.get("turns", 0),
+            "remaining": [label for key, label in interview_state.AXES.items()
+                          if not axes.get(key, {}).get("closed")],
+        }
+    return index
+
+
+def to_view(article, interviews):
     return {
         "url": article.get("url"),
         "title": article.get("title"),
         "source": article.get("source"),
         "published_at": article.get("published_at"),
         "summary": article.get("summary"),
+        "interview": interviews.get(article.get("url")),
     }
 
 
@@ -102,6 +124,7 @@ def run(args):
         selected = articles
 
     selected = sorted(selected, key=sort_key, reverse=True)
+    interviews = interview_index()
 
     if widened:
         selected = selected[:10]
@@ -112,7 +135,7 @@ def run(args):
             "days": args.days if args.mode == "recent_days" else None,
             "widened": widened,
             "count": len(selected),
-            "articles": [to_view(a) for a in selected],
+            "articles": [to_view(a, interviews) for a in selected],
         },
         ensure_ascii=False,
     ))

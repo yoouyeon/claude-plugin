@@ -9,7 +9,7 @@ Usage:
 경로는 인자로 받지 않는다 — 노트 폴더는 config.yaml의 `notes_path`에서, articles.json은 고정 경로(`paths.data_root()`)에서 찾는다.
 
 동작:
-    1. 제목을 슬러그로 변환 (한글 유지, 공백→`-`, 특수문자 제거, SLUG_MAX_BYTES로 자름).
+    1. 제목을 슬러그로 변환 (`paths.slugify` — 인터뷰 파일과 같은 규칙).
     2. 오늘(로컬) 날짜로 파일명 `YYYY-MM-DD-<슬러그>.md`를 조립해 노트 폴더에 쓴다.
        같은 이름이 이미 있으면 `-2`, `-3`...을 붙여 기존 메모를 덮어쓰지 않는다.
     3. frontmatter(title/url/source/date) + stdin 본문으로 파일을 쓴다.
@@ -24,35 +24,16 @@ stdout (JSON):
 import argparse
 import json
 import os
-import re
 import sys
 from datetime import datetime
 from typing import NoReturn
 
 import paths
 
-# 슬러그 상한(바이트). 긴 제목이 그대로 파일명이 되면 셸·파인더에서 다루기 나빠진다.
-# 한글은 UTF-8에서 글자당 3바이트라 40자쯤에서 걸린다. 원제목은 frontmatter에 온전히 남는다.
-SLUG_MAX_BYTES = 120
-
 
 def fail(msg) -> NoReturn:
     print(json.dumps({"ok": False, "error": msg}, ensure_ascii=False))
     sys.exit(1)
-
-
-def slugify(title):
-    """한글 유지, 공백 -> '-', 특수문자 제거, SLUG_MAX_BYTES로 자름."""
-    s = re.sub(r"[^\w\s-]", "", title, flags=re.UNICODE)
-    s = re.sub(r"\s+", "-", s.strip())
-    s = re.sub(r"-+", "-", s)
-    s = s.strip("-")
-
-    encoded = s.encode("utf-8")
-    if len(encoded) > SLUG_MAX_BYTES:
-        # errors="ignore"가 잘린 멀티바이트 문자 조각을 떨어뜨린다.
-        s = encoded[:SLUG_MAX_BYTES].decode("utf-8", "ignore").rstrip("-")
-    return s or "untitled"
 
 
 def unique_filename(notes_dir, base_name):
@@ -86,7 +67,7 @@ def run(args, body):
         fail(f"article not found for url: {args.url}")
 
     date_str = datetime.now().astimezone().date().isoformat()
-    slug = slugify(args.title)
+    slug = paths.slugify(args.title)
     base_name = f"{date_str}-{slug}"
     filename = unique_filename(notes_dir, base_name)
 
