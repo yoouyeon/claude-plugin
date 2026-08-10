@@ -10,6 +10,11 @@
       "name": "articles-os",
       "source": "./plugins/articles-os",
       "description": "RSS 기반 기술 아티클 학습 파이프라인. 매일 수집·Slack/Discord 알림·원문 Q&A·회상 인터뷰 메모. Claude Code 전용(순수 터미널, 헤드리스 지원)."
+    },
+    {
+      "name": "leetlog",
+      "source": "./plugins/leetlog",
+      "description": "LeetCode 풀이 기록 플러그인. 문제 준비부터 힌트·소요 시간 기록·풀이 문서·로컬 커밋까지 스킬로 다룬다."
     }
   ]
 }
