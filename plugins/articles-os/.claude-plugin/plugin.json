@@ -1,6 +1,6 @@
 {
   "name": "articles-os",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "RSS 기반 기술 아티클 학습 파이프라인. 매일 수집·Slack/Discord 알림·원문 Q&A·회상 인터뷰 메모. Claude Code 전용(순수 터미널, 헤드리스 지원).",
   "author": {
     "name": "유연",

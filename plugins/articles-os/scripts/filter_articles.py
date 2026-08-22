@@ -81,7 +81,7 @@ def interview_index():
         except (OSError, ValueError, KeyError):
             continue
         index[url] = {
-            "turns": doc.get("turns", 0),
+            "turns": interview_state.turn_count(doc),
             "remaining": [label for key, label in interview_state.AXES.items()
                           if not axes.get(key, {}).get("closed")],
         }
