@@ -5,7 +5,7 @@ description: >
   "이 문제 풀 준비 해줘", "leetcode 시작", "이거 다시 풀래", 문제 URL이나 slug만 던지는 요청이 오면 이 스킬을 실행한다.
 argument-hint: <문제 URL 또는 slug> [언어]
 arguments: [target, language]
-allowed-tools: Read, Write, Edit, Glob, WebFetch, Bash(git rev-parse:*), Bash(date:*)
+allowed-tools: Read, Write, Edit, Glob, Bash(git rev-parse:*), Bash(date:*), Bash(python3:*)
 metadata:
   version: "0.1.0"
 ---
@@ -46,21 +46,21 @@ metadata:
 
 ## 5. 메타 조회
 
-WebFetch로 아래 URL 하나만 요청한다. 프롬프트는 "응답 JSON을 그대로 반환한다"로 준다.
+아래 스크립트를 한 번만 실행한다. `<langSlug>`는 3단계에서 확보한 값이다.
 
-```
-https://leetcode.com/graphql/?query={question(titleSlug:"<slug>"){questionFrontendId title difficulty topicTags{name} codeSnippets{langSlug code} hints}}
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/fetch_question.py" "<slug>" --lang "<langSlug>"
 ```
 
 **실패해도 재시도하지 않는다.**
 
-응답이 없거나 `question`이 `null`이면 문제 번호·제목·난이도를 사용자에게 묻는다. 태그는 비우고, 시그니처를 못 받았으므로 7단계에서 함수 자리를 빈 줄로 둔다.
+종료 코드가 0이 아니거나(응답 없음) 출력의 `question`이 `null`이면 문제 번호·제목·난이도를 사용자에게 묻는다. 태그는 비우고, 시그니처를 못 받았으므로 7단계에서 함수 자리를 빈 줄로 둔다.
 
 ## 6. 시그니처 선택
 
-`codeSnippets`에서 `langSlug`가 일치하는 항목의 `code`를 쓴다.
+`codeSnippets`에 남은 항목의 `code`를 쓴다. 스크립트가 이미 `langSlug`로 걸러 두었다.
 
-일치하는 항목이 없으면 응답에 실제로 있는 언어 목록을 보여주고 고르게 한 뒤, 3단계 매핑과 4단계 판정을 그 언어로 다시 한다.
+`codeSnippets`가 비어 있으면 `availableLangs`의 언어 목록을 보여주고 고르게 한 뒤, 3단계 매핑과 4단계 판정을 그 언어로 다시 한다. 다시 조회하지 않고, 필요하면 `--lang` 없이 한 번 더 실행해 고른 언어의 `code`를 얻는다.
 
 ## 7. 파일 쓰기
 
