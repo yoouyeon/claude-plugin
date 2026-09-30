@@ -7,7 +7,7 @@ argument-hint: <문제 URL 또는 slug> [언어]
 arguments: [target, language]
 allowed-tools: Read, Write, Edit, Glob, Bash(git rev-parse:*), Bash(date:*), Bash(python3:*), Bash(echo:*)
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 - `ROOT`: !`git rev-parse --show-toplevel 2>/dev/null || pwd`

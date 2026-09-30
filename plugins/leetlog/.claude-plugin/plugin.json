@@ -1,6 +1,6 @@
 {
   "name": "leetlog",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "LeetCode 풀이 기록 플러그인. 문제 준비부터 힌트·소요 시간 기록·풀이 문서·로컬 커밋까지 스킬로 다룬다.",
   "author": {
     "name": "유연",
