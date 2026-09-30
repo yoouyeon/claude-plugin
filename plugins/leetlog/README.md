@@ -25,6 +25,17 @@ LeetCode 문제 URL 하나만 주면 풀이 파일을 만들고, 풀다 막히�
 
 처음 `prep` 실행할 때 어떤 언어로 주로 풀지 한 번 확인하고, 그 답을 `.leetlog.json`에 담아 기본 언어로 설정합니다.
 
+기본 언어로 TypeScript를 선택했다면 `.leetlog.json`은 다음과 같이 생성됩니다.
+
+```json
+{
+  "default_language": "typescript",
+  "solutions_dir": "solutions"
+}
+```
+
+풀이 파일을 다른 곳에 저장하려면 저장소 루트의 `.leetlog.json`에서 `solutions_dir`을 원하는 상대 경로로 수정합니다(예: `leetcode/solutions`). 값을 생략해도 `solutions`를 사용합니다. 설정을 바꿔도 기존 파일은 자동으로 이동하지 않으므로, 기존 풀이를 계속 사용하려면 새 디렉토리로 옮겨야 합니다. 풀이 문서는 계속 `docs/`에 저장됩니다.
+
 ## 스킬 모음
 
 | 스킬 | 사용 시점 |
@@ -108,9 +119,9 @@ docs: 54. Spiral Matrix
 기록은 모두 지금 작업 중인 저장소 안에 남습니다.
 
 ```
-.leetlog.json                                        설정 (주로 쓰는 언어)
-solutions/{Easy|Medium|Hard}/{번호}_{slug}.{확장자}    풀이 코드
-docs/{번호}_{slug}.md                                 풀이 문서
+.leetlog.json                                                 설정 (기본 언어·풀이 디렉토리)
+<solutions_dir>/{Easy|Medium|Hard}/{번호}_{slug}.{확장자}    풀이 코드
+docs/{번호}_{slug}.md                                          풀이 문서
 ```
 
 같은 문제를 같은 언어로 다시 풀면 기존 파일 위에 새 풀이가 쌓입니다.

@@ -5,18 +5,24 @@ description: >
   "힌트 줘", "막혔어", "모르겠어", "어떻게 접근하지" 같은 요청이 오면 이 스킬을 실행한다.
 argument-hint: [문제 번호 또는 URL]
 arguments: [target]
-allowed-tools: Read, Glob, WebFetch, Bash(git rev-parse:*)
+allowed-tools: Read, Glob, Bash(git rev-parse:*), Bash(python3:*), Bash(echo:*)
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 - `ROOT`: !`git rev-parse --show-toplevel 2>/dev/null || pwd`
+
+아래 스크립트를 실행하고 출력된 절대 경로를 `SOLUTION_DIR`로 쓴다. 종료 코드가 0이 아니면 오류를 알리고 중단한다.
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/solution_dir.py" "<ROOT>"
+```
 
 ## 1. 대상 특정
 
 `target`이 URL이나 slug면 거기서 slug를 뽑는다. `https://leetcode.com/problems/<slug>/` 뒤에 무엇이 붙어 있어도 `problems/` 다음 한 마디가 slug다.
 
-`target`이 숫자면 `ROOT/solutions/*/<숫자>_*.*`를 Glob한다. 이 때, slug는 파일명의 `{id}_{slug}.{ext}`에서 읽는다. 파일이 여럿이면 (같은 문제를 여러 언어로 푼 경우) slug는 동일하니 한 파일만 확인한다.
+`target`이 숫자면 `SOLUTION_DIR/*/<숫자>_*.*`를 Glob한다. 이 때, slug는 파일명의 `{id}_{slug}.{ext}`에서 읽는다. 파일이 여럿이면 (같은 문제를 여러 언어로 푼 경우) slug는 동일하니 한 파일만 확인한다.
 
 `target`이 없으면 대화 맥락에서 방금 다룬 문제를 쓴다. 맥락에도 없으면 어느 문제인지 묻고 중단한다.
 
@@ -32,13 +38,13 @@ metadata:
 
 대화 맥락에 `/leetlog:prep`이 받아온 `hints` 배열이 있으면 그것을 쓴다. 몇 번째까지 줬는지도 맥락에서 읽는다.
 
-맥락에 없을 때만 WebFetch로 아래 URL 하나를 요청한다. 프롬프트는 "응답 JSON을 그대로 반환한다"로 준다. **실패해도 재시도하지 않는다.**
+맥락에 없을 때만 아래 스크립트를 한 번 실행하고 출력의 `hints`를 쓴다. **실패해도 재시도하지 않는다.**
 
-```
-https://leetcode.com/graphql/?query={question(titleSlug:"<slug>"){hints}}
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/fetch_question.py" "<slug>" --no-snippets
 ```
 
-응답은 받았는데 `question`이 `null`이면 그 slug의 문제가 존재하지 않는 것이다. 대상이 틀렸으므로 문제 URL을 다시 묻고 중단한다.
+종료 코드가 0이 아니면 응답 자체를 받지 못한 것이다. 응답은 받았는데 `question`이 `null`이면 그 slug의 문제가 존재하지 않는 것이다. 대상이 틀렸으므로 문제 URL을 다시 묻고 중단한다.
 
 아래 셋 중 하나의 경우 공식 힌트가 없는 것이다. 이 경우에는 4단계를 건너뛰고 **5단계 유도 질문 모드**로 간다.
 

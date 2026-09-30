@@ -5,12 +5,18 @@ description: >
   "문서로 남겨줘", "풀이 정리해줘", "docs" 같은 요청이 오면 이 스킬을 실행한다.
 argument-hint: [문제 번호 또는 파일 경로]
 arguments: [target]
-allowed-tools: Read, Glob, Bash(git rev-parse:*), Bash(python3:*)
+allowed-tools: Read, Glob, Bash(git rev-parse:*), Bash(python3:*), Bash(echo:*)
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 - `ROOT`: !`git rev-parse --show-toplevel 2>/dev/null || pwd`
+
+아래 스크립트를 실행하고 출력된 절대 경로를 `SOLUTION_DIR`로 쓴다. 종료 코드가 0이 아니면 오류를 알리고 중단한다.
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/solution_dir.py" "<ROOT>"
+```
 
 ## 1. 대상 특정
 
@@ -18,7 +24,7 @@ metadata:
 
 `target`이 파일 경로면 그 파일이다.
 
-`target`이 숫자면 `ROOT/solutions/*/<숫자>_*.*`를 Glob한다.
+`target`이 숫자면 `SOLUTION_DIR/*/<숫자>_*.*`를 Glob한다.
 
 - 결과가 없으면 그 사실을 알리고 중단한다.
 - 하나면 그 파일로 진행한다.
@@ -35,7 +41,7 @@ metadata:
 ## 3. 문서 쓰기
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/skills/docs/scripts/write_doc.py" "<대상 파일 경로>" --fence <펜스 태그>
+python3 "${CLAUDE_PLUGIN_ROOT}/skills/docs/scripts/write_doc.py" "<대상 파일 경로>" --fence <펜스 태그> --root "<ROOT>"
 ```
 
 문서를 직접 만들거나 고치지 않는다. 이 스크립트만 문서를 수정한다.

@@ -5,12 +5,18 @@ description: >
   "다 풀었어", "풀이 끝", "제출했어", "done" 같은 요청이 오면 이 스킬을 실행한다.
 argument-hint: [문제 번호 또는 파일 경로]
 arguments: [target]
-allowed-tools: Read, Glob, Grep, Skill, Bash(git rev-parse:*), Bash(python3:*)
+allowed-tools: Read, Glob, Grep, Skill, Bash(git rev-parse:*), Bash(python3:*), Bash(echo:*)
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 - `ROOT`: !`git rev-parse --show-toplevel 2>/dev/null || pwd`
+
+아래 스크립트를 실행하고 출력된 절대 경로를 `SOLUTION_DIR`로 쓴다. 종료 코드가 0이 아니면 오류를 알리고 중단한다.
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/solution_dir.py" "<ROOT>"
+```
 
 ## 1. 대상 특정
 
@@ -18,9 +24,9 @@ metadata:
 
 `target`이 파일 경로면 그 파일이다.
 
-`target`이 숫자면 `ROOT/solutions/*/<숫자>_*.*`를 Glob한다. 결과가 없으면 그 사실을 알리고 중단한다. 여럿이면(같은 문제를 여러 언어로 푼 경우) 아래 Grep 패턴으로 미마감 ANCHOR가 있는 것만 남긴다.
+`target`이 숫자면 `SOLUTION_DIR/*/<숫자>_*.*`를 Glob한다. 결과가 없으면 그 사실을 알리고 중단한다. 여럿이면(같은 문제를 여러 언어로 푼 경우) 아래 Grep 패턴으로 미마감 ANCHOR가 있는 것만 남긴다.
 
-`target`이 없으면 `ROOT/solutions` 아래를 Grep으로 검색한다.
+`target`이 없으면 `SOLUTION_DIR` 아래를 Grep으로 검색한다.
 
 ```
 ANCHOR \d{4}\.\d{2}\.\d{2} \d{2}:\d{2} 풀이
