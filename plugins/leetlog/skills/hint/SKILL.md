@@ -5,18 +5,24 @@ description: >
   "힌트 줘", "막혔어", "모르겠어", "어떻게 접근하지" 같은 요청이 오면 이 스킬을 실행한다.
 argument-hint: [문제 번호 또는 URL]
 arguments: [target]
-allowed-tools: Read, Glob, Bash(git rev-parse:*), Bash(python3:*)
+allowed-tools: Read, Glob, Bash(git rev-parse:*), Bash(python3:*), Bash(echo:*)
 metadata:
   version: "0.1.0"
 ---
 
 - `ROOT`: !`git rev-parse --show-toplevel 2>/dev/null || pwd`
 
+아래 스크립트를 실행하고 출력된 절대 경로를 `SOLUTION_DIR`로 쓴다. 종료 코드가 0이 아니면 오류를 알리고 중단한다.
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/solution_dir.py" "<ROOT>"
+```
+
 ## 1. 대상 특정
 
 `target`이 URL이나 slug면 거기서 slug를 뽑는다. `https://leetcode.com/problems/<slug>/` 뒤에 무엇이 붙어 있어도 `problems/` 다음 한 마디가 slug다.
 
-`target`이 숫자면 `ROOT/solutions/*/<숫자>_*.*`를 Glob한다. 이 때, slug는 파일명의 `{id}_{slug}.{ext}`에서 읽는다. 파일이 여럿이면 (같은 문제를 여러 언어로 푼 경우) slug는 동일하니 한 파일만 확인한다.
+`target`이 숫자면 `SOLUTION_DIR/*/<숫자>_*.*`를 Glob한다. 이 때, slug는 파일명의 `{id}_{slug}.{ext}`에서 읽는다. 파일이 여럿이면 (같은 문제를 여러 언어로 푼 경우) slug는 동일하니 한 파일만 확인한다.
 
 `target`이 없으면 대화 맥락에서 방금 다룬 문제를 쓴다. 맥락에도 없으면 어느 문제인지 묻고 중단한다.
 

@@ -1,11 +1,11 @@
 ---
 name: commit
 description: >
-  leetlog가 만든 LeetCode 풀이 파일(`solutions/`)과 풀이 문서(`docs/`)를 로컬 커밋하는 스킬.
+  leetlog가 만든 LeetCode 풀이 파일(설정된 풀이 디렉토리)과 풀이 문서(`docs/`)를 로컬 커밋하는 스킬.
   그 외의 파일을 커밋할 때에는 이 스킬을 사용하지 않는다.
 argument-hint: [문제 번호 또는 파일 경로]
 arguments: [target]
-allowed-tools: Read, Glob, Bash(git rev-parse:*), Bash(git status:*), Bash(git add:*)
+allowed-tools: Read, Glob, Bash(git rev-parse:*), Bash(git status:*), Bash(git add:*), Bash(python3:*), Bash(echo:*)
 metadata:
   version: "0.1.0"
 ---
@@ -17,6 +17,12 @@ metadata:
 
 `저장소 여부`가 `true`가 아니면 git 저장소가 아니라 커밋을 건너뛴다고 알리고 종료한다. `git init`을 하지 않는다.
 
+아래 스크립트를 실행하고 출력된 절대 경로를 `SOLUTION_DIR`로 쓴다. 종료 코드가 0이 아니면 오류를 알리고 중단한다.
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/solution_dir.py" "<ROOT>"
+```
+
 ## 2. 대상 특정
 
 `target`이 파일 경로면 그 파일 하나가 대상이다.
@@ -24,7 +30,7 @@ metadata:
 `target`이 문제 번호면 아래 둘을 Glob으로 찾아 나온 것을 전부 후보로 삼는다.
 
 ```
-ROOT/solutions/*/<번호>_*.*
+SOLUTION_DIR/*/<번호>_*.*
 ROOT/docs/<번호>_*.md
 ```
 
@@ -44,15 +50,15 @@ git status --porcelain -- <후보 경로들>
 
 ## 4. 메시지
 
-대상 파일마다 접두사를 **경로에서** 판정한다.
+대상 파일마다 접두사를 **경로에서** 판정한다. `target`이 파일 경로로 들어왔다면 그 파일이 `SOLUTION_DIR` 또는 `ROOT/docs` 아래인지 확인하고, 둘 다 아니면 커밋하지 않는다.
 
-- `solutions/` 아래: `solve:`
-- `docs/` 아래: `docs:`
+- `SOLUTION_DIR` 아래: `solve:`
+- `ROOT/docs` 아래: `docs:`
 
 문제 번호와 제목은 파일 안에서 읽는다.
 
-- `solutions/` 파일: 헤더 블록 주석의 `문제 : <번호> - <제목>`
-- `docs/` 파일: frontmatter의 `title: <번호>. <제목>`
+- `SOLUTION_DIR` 파일: 헤더 블록 주석의 `문제 : <번호> - <제목>`
+- `ROOT/docs` 파일: frontmatter의 `title: <번호>. <제목>`
 
 읽지 못하면 **커밋하지 않고 멈춘 뒤** 제목을 묻는다. 답을 받고 나서 5단계로 간다.
 

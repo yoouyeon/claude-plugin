@@ -5,7 +5,7 @@ description: >
   "이 문제 풀 준비 해줘", "leetcode 시작", "이거 다시 풀래", 문제 URL이나 slug만 던지는 요청이 오면 이 스킬을 실행한다.
 argument-hint: <문제 URL 또는 slug> [언어]
 arguments: [target, language]
-allowed-tools: Read, Write, Edit, Glob, Bash(git rev-parse:*), Bash(date:*), Bash(python3:*)
+allowed-tools: Read, Write, Edit, Glob, Bash(git rev-parse:*), Bash(date:*), Bash(python3:*), Bash(echo:*)
 metadata:
   version: "0.1.0"
 ---
@@ -26,10 +26,16 @@ metadata:
 `ROOT/.leetlog.json`을 읽는다. 없으면 어떤 언어로 주로 풀지 묻고 답을 담아 만든다.
 
 ```json
-{ "default_language": "typescript" }
+{ "default_language": "typescript", "solutions_dir": "solutions" }
 ```
 
 `language`가 있으면 이번 실행에만 그 값을 쓰고 `.leetlog.json`은 수정하지 않는다.
+
+아래 스크립트를 실행하고 출력된 절대 경로를 `SOLUTION_DIR`로 쓴다. 설정 파일이 없거나 `solutions_dir` 키가 없으면 기본값인 `ROOT/solutions`가 나온다. 종료 코드가 0이 아니면 오류를 알리고 중단한다.
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/solution_dir.py" "<ROOT>"
+```
 
 ## 3. 언어 매핑
 
@@ -39,7 +45,7 @@ metadata:
 
 ## 4. 재풀이 판정
 
-`ROOT/solutions/*/*_<slug>.<ext>`를 Glob으로 찾는다.
+`SOLUTION_DIR/*/*_<slug>.<ext>`를 Glob으로 찾는다.
 
 - 파일이 있으면 재풀이이고 그 파일이 수정 대상이다.
 - 없으면 첫 풀이다.
@@ -66,7 +72,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/fetch_question.py" "<slug>" --lang "<lang
 
 ### 7-1. 첫 풀이
 
-`ROOT/solutions/<difficulty>/<questionFrontendId>_<slug>.<ext>`를 만든다. `difficulty`는 `Easy`/`Medium`/`Hard` 그대로 설정한다.
+`SOLUTION_DIR/<difficulty>/<questionFrontendId>_<slug>.<ext>`를 만든다. `difficulty`는 `Easy`/`Medium`/`Hard` 그대로 설정한다.
 
 메타는 블록 주석, ANCHOR는 줄 주석으로 쓴다. 주석 문법은 3단계에서 확보한 언어 것을 쓴다.
 

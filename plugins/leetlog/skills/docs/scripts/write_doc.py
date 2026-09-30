@@ -5,7 +5,9 @@ Usage:
     python3 write_doc.py <풀이 파일 경로> --fence <펜스 태그> [옵션]
 
 옵션:
-    --doc <경로>        문서 경로를 직접 지정한다. 없으면 풀이 파일 경로에서 유도한다.
+    --root <경로>       저장소 루트. 문서는 그 아래 docs/에 만든다.
+    --doc <경로>        문서 경로를 직접 지정한다. --root보다 우선한다.
+                       둘 다 없으면 풀이 파일 경로에서 유도한다.
     --title <값>        헤더에서 못 읽은 메타를 대신 넘긴다. 번호가 빠져 있으면 파일명에서 읽어 `<번호>. <제목>`으로 맞춘다.
     --difficulty <값>
     --url <값>
@@ -187,6 +189,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("path")
     parser.add_argument("--fence", required=True, help="마크다운 코드 펜스 태그")
+    parser.add_argument("--root", help="문서를 저장할 저장소 루트")
     parser.add_argument("--doc", help="문서 경로. 없으면 풀이 파일 경로에서 유도")
     parser.add_argument("--title")
     parser.add_argument("--difficulty")
@@ -249,6 +252,8 @@ def main() -> int:
 
     if args.doc:
         doc = Path(args.doc)
+    elif args.root:
+        doc = Path(args.root).resolve() / "docs" / f"{solution.stem}.md"
     else:
         try:
             doc = solution.resolve().parents[2] / "docs" / f"{solution.stem}.md"
