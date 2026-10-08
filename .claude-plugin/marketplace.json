@@ -15,6 +15,11 @@
       "name": "leetlog",
       "source": "./plugins/leetlog",
       "description": "LeetCode 풀이 기록 플러그인. 문제 준비부터 힌트·소요 시간 기록·풀이 문서·로컬 커밋까지 스킬로 다룬다."
+    },
+    {
+      "name": "devdocs",
+      "source": "./plugins/devdocs",
+      "description": "개발 산출물 문서(스펙·리서치 메모·PR 본문·이슈 본문·README)를 한국어로 쓰고 검사한다. 문서 종류에 맞는 문체로 쓰고, 줄표·번역투·종결어미 등을 검사한다."
     }
   ]
 }
