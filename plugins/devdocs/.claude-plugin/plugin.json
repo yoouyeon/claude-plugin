@@ -1,0 +1,15 @@
+{
+  "name": "devdocs",
+  "version": "0.1.0",
+  "description": "개발 산출물 문서(스펙·리서치 메모·PR 본문·이슈 본문·README)를 한국어로 쓰고 검사한다. 문서 종류에 맞는 문체로 쓰고, 줄표·번역투·종결어미 등을 검사한다.",
+  "author": {
+    "name": "유연",
+    "email": "jyeon.yoon59@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "korean",
+    "writing",
+    "docs"
+  ]
+}
