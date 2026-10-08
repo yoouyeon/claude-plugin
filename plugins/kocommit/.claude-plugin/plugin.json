@@ -1,0 +1,15 @@
+{
+  "name": "kocommit",
+  "version": "0.1.0",
+  "description": "변경사항을 논리 단위로 나눠 한국어 Conventional Commits 메시지로 커밋한다. 레포에 커밋 규칙이 있으면 그 규칙을 먼저 따른다.",
+  "author": {
+    "name": "유연",
+    "email": "jyeon.yoon59@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "korean",
+    "git",
+    "commit"
+  ]
+}
