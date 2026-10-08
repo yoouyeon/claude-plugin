@@ -20,6 +20,11 @@
       "name": "devdocs",
       "source": "./plugins/devdocs",
       "description": "개발 산출물 문서(스펙·리서치 메모·PR 본문·이슈 본문·README)를 한국어로 쓰고 검사한다. 문서 종류에 맞는 문체로 쓰고, 줄표·번역투·종결어미 등을 검사한다."
+    },
+    {
+      "name": "kocommit",
+      "source": "./plugins/kocommit",
+      "description": "변경사항을 논리 단위로 나눠 한국어 Conventional Commits 메시지로 커밋한다. 레포에 커밋 규칙이 있으면 그 규칙을 먼저 따른다."
     }
   ]
 }
