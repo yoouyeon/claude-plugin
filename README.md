@@ -10,6 +10,7 @@ Claude Code 플러그인 모음.
 | [leetlog](plugins/leetlog/README.md) | LeetCode 풀이 기록. 문제 준비·단계별 힌트·소요 시간 기록·풀이 문서·로컬 커밋 |
 | [devdocs](plugins/devdocs/README.md) | 개발 산출물 문서 작성·검사. 스펙·리서치 메모·PR 본문·이슈 본문·README |
 | [kocommit](plugins/kocommit/README.md) | 한국어 Conventional Commits 커밋. 커밋 단위 나누기·메시지 검사 |
+| [devbuddy](plugins/devbuddy/README.md) | 개발 초보자용 AI 코딩 도우미. 요청 확인·패키지 실재 확인·위험 작업 사전 확인·검증 근거가 있는 완료 보고 |
 
 ## 설치
 
@@ -19,4 +20,5 @@ Claude Code 플러그인 모음.
 /plugin install leetlog@yoouyeon-plugins
 /plugin install devdocs@yoouyeon-plugins
 /plugin install kocommit@yoouyeon-plugins
+/plugin install devbuddy@yoouyeon-plugins
 ```
