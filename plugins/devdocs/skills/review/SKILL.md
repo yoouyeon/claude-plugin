@@ -8,7 +8,7 @@ argument-hint: [파일 경로]
 arguments: [target]
 allowed-tools: Read, Edit, Bash(python3:*)
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 모호한 것은 추측하지 않고 사용자에게 묻는다.
@@ -21,6 +21,8 @@ metadata:
 
 `${CLAUDE_PLUGIN_ROOT}/reference/writing.md`를 읽는다. 대상 파일을 읽고 문서 종류(`spec`, `memo`, `pr`, `issue`, `readme`)와 버전(기본, 존댓말)을 정한다. 파일 위치와 내용으로 확실히 정해지지 않으면 묻는다. 다섯 종류에 들지 않는 문서면 이 스킬의 대상이 아니라고 알리고 중단한다.
 
+공개 문서인지 정한다. `pr`, `issue`, `readme` 는 공개 문서로 본다. `spec`, `memo` 는 사용자가 공개라고 했거나 파일이 공개 저장소에 들어가는 위치면 공개로 보고, 정해지지 않으면 묻는다. 사용자가 비공개라고 하면 그 말을 따른다.
+
 ## 3. 검사
 
 ```bash
@@ -29,7 +31,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check.py" "<대상 파일>" --type <종�
 
 존댓말 버전이면 `--polite`를 붙인다. 종료 코드가 `2`면 출력을 전하고 중단한다.
 
-`${CLAUDE_PLUGIN_ROOT}/reference/model-check.md`를 읽고 그 항목을 찾는다.
+`${CLAUDE_PLUGIN_ROOT}/reference/model-check.md`를 읽고 그 항목을 찾는다. 공개 문서가 아니면 "공개 문서 항목"은 건너뛴다.
 
 ## 4. 보고
 
