@@ -7,7 +7,7 @@ description: >
 argument-hint: "[존댓말] [문서 종류]"
 allowed-tools: Read, Write, Edit, Bash(pwd), Bash(python3:*)
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 - `ROOT`: !`pwd`
@@ -21,6 +21,8 @@ metadata:
 ## 2. 버전
 
 요청이나 스킬 인자에 "존댓말"이 있으면 존댓말 버전, 없으면 기본 버전이다.
+
+review 스킬과 같은 기준으로 공개 문서인지 정한다. `pr`, `issue`, `readme` 는 공개 문서로 본다. `spec`, `memo` 는 사용자가 공개라고 했거나 파일이 공개 저장소에 들어가는 위치면 공개로 보고, 정해지지 않으면 묻는다. 사용자가 비공개라고 하면 그 말을 따른다.
 
 ## 3. 작성
 
@@ -40,7 +42,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check.py" "<DRAFT>" --type <종류> [--po
 
 존댓말 버전이면 `--polite`를 붙인다. 종료 코드가 `2`면 출력을 전하고 중단한다.
 
-`${CLAUDE_PLUGIN_ROOT}/reference/model-check.md`를 읽고 `DRAFT`를 다시 읽으며 그 항목을 찾는다. 스크립트 출력과 함께 고칠 후보로 삼아, 고칠 곳만 `DRAFT`에서 고친다.
+`${CLAUDE_PLUGIN_ROOT}/reference/model-check.md`를 읽고 `DRAFT`를 다시 읽으며 그 항목을 찾는다. 스크립트 출력과 함께 고칠 후보로 삼아, 고칠 곳만 `DRAFT`에서 고친다. 공개 문서가 아니면 "공개 문서 항목"은 건너뛴다. 공개 문서 항목에 걸린 곳은 고치지 말고 5단계 목록에 같이 보여 준다. 빼도 되는지는 사용자가 정한다.
 
 ## 5. 2차 검사
 
